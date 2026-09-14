@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, FileText, Save, Eye, Calendar, Upload, Share2, AlertCircle, Check, Paperclip, Trash2, RefreshCw } from 'lucide-react';
+import { X, FileText, Save, Eye, Calendar, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Department } from '../../hooks/useOrganizationalData';
 import { handleError } from '../../lib/errorHandler';
@@ -16,30 +16,20 @@ export default function AddPolicyModal({ isOpen, onClose, onSuccess, departments
   const { orgId } = useOrg();
   const [formData, setFormData] = useState({
     title: '',
-    document_number: '',
     document_type: 'policy',
     content: '',
     department_id: '',
     version: '1.0',
     status: 'draft',
-    effective_date: '',
     review_date: '',
     key_requirements: '',
     affected_roles: '',
     compliance_measures: '', 
     tags: '',
-    message: '',
-    share_emails: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [files, setFiles] = useState<File[]>([]);
-  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
-  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
-  const [isSharing, setIsSharing] = useState(false);
-  const [shareSuccess, setShareSuccess] = useState(false);
-  const [fileUploadError, setFileUploadError] = useState<string | null>(null);
 
   const policyCategories = [
     { value: 'policy', label: 'HR Policy' },
@@ -47,22 +37,6 @@ export default function AddPolicyModal({ isOpen, onClose, onSuccess, departments
     { value: 'procedure', label: 'Safety' },
     { value: 'guideline', label: 'Guideline' },
     { value: 'handbook', label: 'Other' }
-  ];
-
-  const reviewCycles = [
-    { value: 'annual', label: 'Annual' },
-    { value: 'biannual', label: 'Bi-annual' },
-    { value: 'quarterly', label: 'Quarterly' },
-    { value: 'monthly', label: 'Monthly' },
-    { value: 'adhoc', label: 'As Needed' }
-  ];
-
-  // Dummy data for approvers - in production this would come from a database query
-  const approvers = [
-    { id: '1', name: 'Vinnie R. Tannous (CTO)', email: 'vinnie@mpbhealth.com' },
-    { id: '2', name: 'Sarah Johnson (Compliance)', email: 'sarah@mpbhealth.com' },
-    { id: '3', name: 'Michael Chen (Legal)', email: 'michael@mpbhealth.com' },
-    { id: '4', name: 'Emily Rodriguez (HR)', email: 'emily@mpbhealth.com' }
   ];
 
   const handleSubmit = async (e: React.FormEvent, isDraft = true) => {
@@ -111,20 +85,16 @@ ${formData.compliance_measures}
       // Reset form
       setFormData({
         title: '',
-        document_number: '',
         document_type: 'policy',
         content: '',
         department_id: '',
         version: '1.0',
         status: 'draft',
-        effective_date: '',
         review_date: '',
         key_requirements: '',
         affected_roles: '',
         compliance_measures: '',
         tags: '',
-        message: '',
-        share_emails: ''
       });
 
       onSuccess();
@@ -139,89 +109,6 @@ ${formData.compliance_measures}
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFileUploadError(null);
-    const selectedFiles = Array.from(e.target.files || []);
-    
-    // Validate file types
-    const validTypes = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'];
-    const invalidFile = selectedFiles.find(file => {
-      const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-      return !validTypes.includes(ext);
-    });
-    
-    if (invalidFile) {
-      setFileUploadError(`Invalid file type: ${invalidFile.name}. Please upload PDF, DOC, DOCX, XLS, or XLSX files only.`);
-      return;
-    }
-    
-    // Validate file size (10MB max)
-    const oversizedFile = selectedFiles.find(file => file.size > 10 * 1024 * 1024);
-    if (oversizedFile) {
-      setFileUploadError(`File too large: ${oversizedFile.name}. Maximum file size is 10MB.`);
-      return;
-    }
-    
-    // Add new files to the list
-    setFiles(prev => [...prev, ...selectedFiles]);
-    
-    // Initialize progress for each file
-    const newProgress = {...uploadProgress};
-    selectedFiles.forEach(file => {
-      newProgress[file.name] = 0;
-    });
-    setUploadProgress(newProgress);
-    
-    // Simulate upload progress
-    selectedFiles.forEach(file => {
-      simulateFileUpload(file.name);
-    });
-  };
-  
-  const simulateFileUpload = (fileName: string) => {
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.floor(Math.random() * 15) + 5;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-      }
-      setUploadProgress(prev => ({...prev, [fileName]: progress}));
-    }, 300);
-  };
-  
-  const removeFile = (fileName: string) => {
-    setFiles(files.filter(file => file.name !== fileName));
-    setUploadProgress(prev => {
-      const newProgress = {...prev};
-      delete newProgress[fileName];
-      return newProgress;
-    });
-  };
-  
-  const handleEmployeeSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selected = Array.from(e.target.selectedOptions, option => option.value);
-    setSelectedEmployees(selected);
-  };
-  
-  const handleShare = async () => {
-    setIsSharing(true);
-    setShareSuccess(false);
-    
-    // Simulate API call to share policy
-    setTimeout(() => {
-      setIsSharing(false);
-      setShareSuccess(true);
-      
-      // Reset share form after 3 seconds
-      setTimeout(() => {
-        setShareSuccess(false);
-        setSelectedEmployees([]);
-        setFormData(prev => ({...prev, share_emails: '', message: ''}));
-      }, 3000);
-    }, 2000);
   };
 
   const togglePreview = () => {
@@ -273,12 +160,6 @@ ${formData.compliance_measures}
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-sm">
-                {formData.effective_date && (
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="w-4 h-4 text-slate-500" />
-                    <span className="text-slate-700">Effective Date: {formData.effective_date}</span>
-                  </div>
-                )}
                 {formData.review_date && (
                   <div className="flex items-center space-x-2">
                     <Calendar className="w-4 h-4 text-slate-500" />
@@ -371,22 +252,6 @@ ${formData.compliance_measures}
                   </div>
                   
                   <div>
-                    <label htmlFor="document_number" className="block text-sm font-medium text-slate-700 mb-1">
-                      Document Number *
-                    </label>
-                    <input
-                      type="text"
-                      id="document_number"
-                      name="document_number"
-                      required
-                      value={formData.document_number}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-indigo-500"
-                      placeholder="e.g., POL-HR-001"
-                    />
-                  </div>
-                  
-                  <div>
                     <label htmlFor="version" className="block text-sm font-medium text-slate-700 mb-1">
                       Version Number *
                     </label>
@@ -436,20 +301,6 @@ ${formData.compliance_measures}
                         <option key={dept.id} value={dept.id}>{dept.name}</option>
                       ))}
                     </select>
-                  </div>
-
-                  <div>
-                    <label htmlFor="effective_date" className="block text-sm font-medium text-slate-700 mb-1">
-                      Effective Date
-                    </label>
-                    <input
-                      type="date"
-                      id="effective_date"
-                      name="effective_date"
-                      value={formData.effective_date}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-indigo-500"
-                    />
                   </div>
 
                   <div>
@@ -572,187 +423,6 @@ ${formData.compliance_measures}
                 </div>
               </div>
             </div>
-            
-            {/* File Upload Section */}
-            <div className="md:col-span-2">
-              <h3 className="text-lg font-medium text-slate-900 mb-4">Attachments</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Upload Documents
-                  </label>
-                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 flex flex-col items-center">
-                    <Upload className="w-8 h-8 text-slate-400 mb-2" />
-                    <p className="text-sm text-slate-600 mb-1">
-                      Drag & drop files here or click to browse
-                    </p>
-                    <p className="text-xs text-slate-500 mb-4">
-                      Accepted formats: PDF, DOC, DOCX, XLS, XLSX (Max 10MB)
-                    </p>
-                    <label className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors cursor-pointer">
-                      <span>Select Files</span>
-                      <input
-                        type="file"
-                        multiple
-                        accept=".pdf,.doc,.docx,.xls,.xlsx"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                  
-                  {fileUploadError && (
-                    <div className="mt-2 p-2 bg-red-50 rounded text-sm text-red-600 flex items-center space-x-2">
-                      <AlertCircle className="w-4 h-4" />
-                      <span>{fileUploadError}</span>
-                    </div>
-                  )}
-                </div>
-                
-                {/* File List with Upload Progress */}
-                {files.length > 0 && (
-                  <div className="space-y-2 mt-4">
-                    <h4 className="text-sm font-medium text-slate-700">Uploaded Files</h4>
-                    <div className="space-y-2">
-                      {files.map((file, index) => (
-                        <div key={index} className="bg-slate-50 p-3 rounded-lg flex items-center">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-2">
-                              <Paperclip className="w-4 h-4 text-slate-500" />
-                              <p className="text-sm font-medium text-slate-800 truncate">{file.name}</p>
-                            </div>
-                            <div className="mt-1">
-                              <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full bg-indigo-600 rounded-full"
-                                  style={{ width: `${uploadProgress[file.name] || 0}%` }}
-                                ></div>
-                              </div>
-                              <p className="text-xs text-slate-500 mt-1">
-                                {uploadProgress[file.name] === 100 
-                                  ? 'Upload complete' 
-                                  : `Uploading ${uploadProgress[file.name]}%`}
-                              </p>
-                            </div>
-                          </div>
-                          <button 
-                            onClick={() => removeFile(file.name)}
-                            className="ml-2 p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {/* Approvers Section */}
-            <div className="md:col-span-2">
-              <h3 className="text-lg font-medium text-slate-900 mb-4">Approval & Sharing</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Required Approver(s)
-                  </label>
-                  <select
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-indigo-500"
-                    multiple
-                  >
-                    {approvers.map(approver => (
-                      <option key={approver.id} value={approver.id}>
-                        {approver.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-slate-500 mt-1">Hold Ctrl/Cmd to select multiple approvers</p>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Share With
-                  </label>
-                  <select
-                    multiple
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-indigo-500"
-                    onChange={handleEmployeeSelect}
-                    value={selectedEmployees}
-                  >
-                    {departments.map(dept => (
-                      <optgroup key={dept.id} label={dept.name}>
-                        {/* In a real implementation, you'd fetch and display employees by department */}
-                        <option value={`${dept.id}-all`}>All {dept.name} Employees</option>
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="md:col-span-2">
-                  <label htmlFor="share_emails" className="block text-sm font-medium text-slate-700 mb-1">
-                    Additional Email Addresses
-                  </label>
-                  <input
-                    type="text"
-                    id="share_emails"
-                    name="share_emails"
-                    value={formData.share_emails}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-indigo-500"
-                    placeholder="Enter email addresses separated by commas"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Separate multiple emails with commas</p>
-                </div>
-                
-                <div className="md:col-span-2">
-                  <label htmlFor="message" className="block text-sm font-medium text-slate-700 mb-1">
-                    Share Message
-                  </label>
-                  <textarea
-                    id="message"
-                    name="message"
-                    rows={2}
-                    value={formData.message}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-indigo-500"
-                    placeholder="Add an optional message to include when sharing this policy..."
-                  />
-                </div>
-                
-                {/* Share Button */}
-                <div className="md:col-span-2">
-                  <button
-                    type="button"
-                    onClick={handleShare}
-                    disabled={isSharing || selectedEmployees.length === 0 && !formData.share_emails}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                      shareSuccess
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {shareSuccess ? (
-                      <>
-                        <Check className="w-4 h-4" />
-                        <span>Shared Successfully</span>
-                      </>
-                    ) : isSharing ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Sharing...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Share2 className="w-4 h-4" />
-                        <span>Share Policy</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-
             <div className="flex items-center justify-end space-x-3 pt-4">
               <button
                 type="button"

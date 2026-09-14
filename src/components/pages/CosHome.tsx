@@ -118,7 +118,7 @@ export function CosHome() {
       const [trend, risk, reasons, advisors, billing, actions] = await Promise.all([
         supabase.from('fact_iq_mrr_monthly').select('month, enrollments, terminations, mrr_added, mrr_lost, net_mrr_change').in('org_id', orgIds).gte('month', tideWindowStart()).order('month'),
         supabase.from('fact_iq_forward_risk').select('bucket, members, mrr_at_risk').in('org_id', orgIds),
-        supabase.from('fact_iq_reason_mix').select('kind, reason, item_count, mrr').in('org_id', orgIds).eq('kind', 'churn').order('item_count', { ascending: false }).limit(8),
+        supabase.from('fact_iq_reason_mix').select('kind, reason, item_count, mrr').in('org_id', orgIds).in('kind', ['churn', 'hold']).order('item_count', { ascending: false }).limit(16),
         supabase.from('advisor_scorecards').select('org_id, advisor_key, display_name, active_members, mrr, net_mrr, retention_pct, term_soon_90, enrollments_30, margin_pct').in('org_id', orgIds).order('mrr', { ascending: false }).limit(12),
         supabase.from('book_billing_risk').select('member_key, display_name, advisor_label, product_key, monthly_fee, next_billing_date, paid, risk_flag, status').in('org_id', orgIds).order('next_billing_date', { ascending: true, nullsFirst: false }).limit(20),
         supabase.from('book_actions').select('action_key, kind, title, dollars, href, status').in('org_id', orgIds).eq('status', 'proposed').limit(20),
@@ -257,7 +257,12 @@ export function CosHome() {
 
   const pipeLatest = forecastFacts.data?.pipe?.[0];
   const aging = (forecastFacts.data?.pipe || []).reduce((sum, row) => sum + Number(row.aging_over_7 || 0), 0);
-  const ifClosed = Number(pipeLatest?.weighted_amount || latest.get('weighted_forecast')?.value || 0);
+  const ifClosedRaw = pipeLatest?.weighted_amount ?? latest.get('weighted_forecast')?.value;
+  const ifClosed = ifClosedRaw == null ? null : Number(ifClosedRaw);
+  const hasPnlRows = (pnl.data || []).length > 0;
+  const hasTicketSnap = latest.has('open_ticket_count');
+  const churnReasons = (book.data?.reasons || []).filter((row) => row.kind === 'churn').slice(0, 8);
+  const holdReasons = (book.data?.reasons || []).filter((row) => row.kind === 'hold').slice(0, 8);
 
   const marketing = traffic.totals;
   const hasTrafficRows = traffic.rows.length > 0;
@@ -361,18 +366,35 @@ export function CosHome() {
             ))}
           </CommandStrip>
 
-          {(book.data?.reasons || []).length > 0 && (
-            <CosBezel>
-              <h2 className="mb-4 text-[10px] uppercase tracking-[0.2em] text-aryx-faint">Why they left</h2>
-              <div className="space-y-2 text-sm">
-                {book.data?.reasons.map((row) => (
-                  <div key={row.reason} className="flex justify-between gap-4">
-                    <span>{row.reason}</span>
-                    <span className="text-aryx-faint">{compactNumber(row.item_count)} · {money(Number(row.mrr))}</span>
+          {(churnReasons.length > 0 || holdReasons.length > 0) && (
+            <div className="grid gap-6 md:grid-cols-2">
+              {churnReasons.length > 0 && (
+                <CosBezel>
+                  <h2 className="mb-4 text-[10px] uppercase tracking-[0.2em] text-aryx-faint">Why they left</h2>
+                  <div className="space-y-2 text-sm">
+                    {churnReasons.map((row) => (
+                      <div key={`churn-${row.reason}`} className="flex justify-between gap-4">
+                        <span>{row.reason}</span>
+                        <span className="text-aryx-faint">{compactNumber(row.item_count)} · {money(Number(row.mrr))}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </CosBezel>
+                </CosBezel>
+              )}
+              {holdReasons.length > 0 && (
+                <CosBezel>
+                  <h2 className="mb-4 text-[10px] uppercase tracking-[0.2em] text-aryx-faint">Why they are on hold</h2>
+                  <div className="space-y-2 text-sm">
+                    {holdReasons.map((row) => (
+                      <div key={`hold-${row.reason}`} className="flex justify-between gap-4">
+                        <span>{row.reason}</span>
+                        <span className="text-aryx-faint">{compactNumber(row.item_count)} · {money(Number(row.mrr))}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CosBezel>
+              )}
+            </div>
           )}
 
           <CommandStrip title="Enrollments" href="/enrollments">
@@ -398,12 +420,12 @@ export function CosHome() {
               href="/finance"
               warning={pnlSum.coverage < 90 ? `Vendor coverage ${pnlSum.coverage}%` : null}
             >
-              <CommandStat label="Collected" value={money(pnlSum.collected)} hint="EnrollFlow billing" />
-              <CommandStat label="Pending" value={money(pnlSum.pending + pnlSum.pendingCommissions)} hint="AR + unpaid commissions" />
-              <CommandStat label="Failed" value={money(pnlSum.failed)} />
-              <CommandStat label="Vendor" value={money(pnlSum.vendor)} />
-              <CommandStat label="Commissions" value={money(pnlSum.commissions)} hint="Paid only" />
-              <CommandStat label="Net" value={money(pnlSum.net)} hint="Collected − vendor − commissions − SaaS" />
+              <CommandStat label="Collected" value={formatFact(money, { linked: linked.enrollment, loading: pnl.isLoading, hasRows: hasPnlRows, value: pnlSum.collected })} hint="EnrollFlow billing" />
+              <CommandStat label="Pending" value={formatFact(money, { linked: linked.enrollment, loading: pnl.isLoading, hasRows: hasPnlRows, value: pnlSum.pending + pnlSum.pendingCommissions })} hint="AR + unpaid commissions" />
+              <CommandStat label="Failed" value={formatFact(money, { linked: linked.enrollment, loading: pnl.isLoading, hasRows: hasPnlRows, value: pnlSum.failed })} />
+              <CommandStat label="Vendor" value={formatFact(money, { linked: linked.enrollment, loading: pnl.isLoading, hasRows: hasPnlRows, value: pnlSum.vendor })} />
+              <CommandStat label="Commissions" value={formatFact(money, { linked: linked.enrollment, loading: pnl.isLoading, hasRows: hasPnlRows, value: pnlSum.commissions })} hint="Paid only" />
+              <CommandStat label="Net" value={formatFact(money, { linked: linked.enrollment, loading: pnl.isLoading, hasRows: hasPnlRows, value: pnlSum.net })} hint="Collected − vendor − commissions − SaaS" />
             </CommandStrip>
           )}
 
@@ -427,7 +449,7 @@ export function CosHome() {
           {(linked.crm || linked.enrollment) && (
             <CommandStrip title="Forward" href="/finance/forecast">
               {linked.crm && (
-                <CommandStat label="If-closed base" value={money(ifClosed)} hint="Not collected · CRM" />
+                <CommandStat label="If-closed base" value={shown(ifClosed != null, ifClosed, money)} hint="Not collected · CRM" />
               )}
               {forecast && (
                 <>
@@ -441,9 +463,9 @@ export function CosHome() {
           <CommandStrip title="Ops risk" href={linked.tickets ? '/tickets' : '/operations/integrations'} warning={riskNotes[0] || null}>
             {linked.tickets && (
               <>
-                <CommandStat label="Open tickets" value={compactNumber(Number(latest.get('open_ticket_count')?.value || 0))} hint={ticketSpike ? 'Spike vs 7-day baseline' : 'ITSTS'} />
-                <CommandStat label="SLA breach" value={shown(true, latest.get('breached_ticket_count')?.value, compactNumber)} />
-                <CommandStat label="Unassigned" value={shown(true, latest.get('unassigned_ticket_count')?.value, compactNumber)} />
+                <CommandStat label="Open tickets" value={shown(hasTicketSnap, latest.get('open_ticket_count')?.value, compactNumber)} hint={ticketSpike ? 'Spike vs 7-day baseline' : 'ITSTS'} />
+                <CommandStat label="SLA breach" value={shown(latest.has('breached_ticket_count'), latest.get('breached_ticket_count')?.value, compactNumber)} />
+                <CommandStat label="Unassigned" value={shown(latest.has('unassigned_ticket_count'), latest.get('unassigned_ticket_count')?.value, compactNumber)} />
               </>
             )}
             {linked.enrollment && (

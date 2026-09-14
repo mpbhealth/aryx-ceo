@@ -788,7 +788,7 @@ export async function extractTickets(
   if (link.ticket_scope === 'none') return { source: 'it_ticketing', status: 'skipped', metrics: [] };
   const creds = envPair('IT_TICKETING_URL', 'IT_TICKETING_SERVICE_ROLE_KEY');
   if (!creds) return { source: 'it_ticketing', status: 'unconfigured', metrics: [] };
-  if (link.ticket_scope !== 'mpb_pilot' || orgId !== MPB_COS_ORG_ID) {
+  if (orgId !== MPB_COS_ORG_ID || (link.ticket_scope !== 'mpb_pilot' && link.ticket_scope !== 'mapped')) {
     return { source: 'it_ticketing', status: 'skipped', metrics: [], error: 'ticket_scope_unmapped' };
   }
 

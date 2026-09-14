@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { money, periodBounds, type PeriodGrain, type PeriodKey } from '@/lib/cos';
+import { formatFact } from '@/lib/marketingFacts';
 import { downloadCsv } from '@/lib/exportFacts';
 import { useOrg } from '@/contexts/OrgContext';
 import { OrgPicker } from '../cos/OrgPicker';
@@ -50,6 +51,14 @@ export function CosFinance() {
       if (error) throw error;
       return (data || []) as PnlRow[];
     },
+  });
+
+  const hasRows = (rows.data || []).length > 0;
+  const fact = (value: number) => formatFact(money, {
+    linked: linked.enrollment,
+    loading: rows.isLoading,
+    hasRows,
+    value,
   });
 
   const total = useMemo(() => {
@@ -109,16 +118,16 @@ export function CosFinance() {
           </>
         }
       />
-      {total.coverage < 90 && (
+      {hasRows && total.coverage < 90 && (
         <p className="mb-6 rounded-[1.5rem] bg-amber-500/10 px-4 py-3 text-sm ring-1 ring-amber-500/30">
           Vendor coverage is {total.coverage}%. {total.missing} active enrollments have no carrier cost row.
         </p>
       )}
       <CommandStrip title="Period totals">
-        <CommandStat label="Collected" value={money(total.collected)} />
-        <CommandStat label="Vendor cost" value={money(total.vendor)} hint="Current book on the latest month" />
-        <CommandStat label="Commissions" value={money(total.commissions)} hint="Paid" />
-        <CommandStat label="Net operating" value={money(total.net)} />
+        <CommandStat label="Collected" value={fact(total.collected)} />
+        <CommandStat label="Vendor cost" value={fact(total.vendor)} hint="Current book on the latest month" />
+        <CommandStat label="Commissions" value={fact(total.commissions)} hint="Paid" />
+        <CommandStat label="Net operating" value={fact(total.net)} />
       </CommandStrip>
       <div className="mt-10 space-y-3">
         <p className="text-[10px] uppercase tracking-[0.18em] text-aryx-faint">Waterfall</p>

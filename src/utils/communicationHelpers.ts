@@ -28,7 +28,7 @@ ${assignment.description || ''}
   `.trim();
 
   console.log('Sending assignment via Teams:', { assignment, message });
-  return { success: true, message: 'Assignment sent via Teams' };
+  return { success: false, error: 'Teams send is not connected. Copy the assignment instead.' };
 }
 
 export async function sendAssignmentViaEmail(assignment: {
@@ -60,7 +60,7 @@ MPB Health Team
 
   const email = assignment.assignedToEmail || 'user@example.com';
   console.log('Sending assignment via email:', { email, subject, body });
-  return { success: true, message: 'Assignment sent via email' };
+  return { success: false, error: 'Assignment email send is not connected. Copy the assignment instead.' };
 }
 
 export async function copyAssignmentToClipboard(assignment: {

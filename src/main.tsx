@@ -12,8 +12,6 @@ import Login from './components/pages/Login.tsx';
 import ResetPassword from './components/pages/ResetPassword.tsx';
 import { SsoCallback } from './components/pages/SsoCallback.tsx';
 import CosApp from './CosApp.tsx';
-import { PublicDepartmentUploadLanding } from './components/pages/public/PublicDepartmentUploadLanding.tsx';
-import { PublicDepartmentUpload } from './components/pages/public/PublicDepartmentUpload.tsx';
 import './index.css';
 import { Environment } from './lib/environment';
 import { isSupabaseConfigured } from './lib/supabase';
@@ -379,10 +377,6 @@ try {
                     <Route path="/auth/callback" element={<AuthCallback />} />
                     <Route path="/auth/reset-password" element={<ResetPassword />} />
                     <Route path="/sso/callback" element={<SsoCallback />} />
-
-                    {/* Public Department Upload Routes - No Auth Required */}
-                    <Route path="/public/upload" element={<PublicDepartmentUploadLanding />} />
-                    <Route path="/public/upload/:department" element={<PublicDepartmentUpload />} />
 
                     <Route
                       path="/*"

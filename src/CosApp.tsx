@@ -13,7 +13,6 @@ import { remapLegacyPath } from './lib/cos';
 import { ThemeToggle } from './components/brand/ThemeToggle';
 import { OrgProvider, useOrg } from './contexts/OrgContext';
 import { AIAssistantProvider } from './providers/AIAssistantProvider';
-import { GlobalAIAssistant } from './components/ai/GlobalAIAssistant';
 
 const CosHome = lazy(() => import('./components/pages/CosHome'));
 const CosInbox = lazy(() => import('./components/pages/CosInbox'));
@@ -231,7 +230,6 @@ export default function CosApp() {
         <SessionTimeoutWarning />
         <UpdateBanner />
         <InstallAppBanner />
-        <GlobalAIAssistant />
       </AppShell>
     </AIAssistantProvider>
   );

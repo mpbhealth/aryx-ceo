@@ -57,74 +57,13 @@ export interface UseOutlookCalendarOptions {
   endDate?: Date;
 }
 
-// Demo events for when Outlook is not configured
-const generateDemoEvents = (startDate: Date, endDate: Date): CalendarEvent[] => {
-  const events: CalendarEvent[] = [];
-  
-  // Generate some sample events
-  const sampleEvents = [
-    { subject: 'Team Standup', duration: 30, hour: 9, recurring: true },
-    { subject: 'Project Review', duration: 60, hour: 14, recurring: false },
-    { subject: 'Client Call', duration: 45, hour: 11, recurring: false },
-    { subject: 'Sprint Planning', duration: 120, hour: 10, recurring: false },
-    { subject: 'Lunch Break', duration: 60, hour: 12, recurring: true },
-    { subject: '1:1 with Manager', duration: 30, hour: 15, recurring: false },
-  ];
-
-  const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-  
-  for (let day = 0; day < daysDiff; day++) {
-    const currentDate = new Date(startDate);
-    currentDate.setDate(currentDate.getDate() + day);
-    
-    // Skip weekends
-    if (currentDate.getDay() === 0 || currentDate.getDay() === 6) continue;
-    
-    // Add 2-3 events per day
-    const numEvents = Math.floor(Math.random() * 2) + 2;
-    const shuffled = [...sampleEvents].sort(() => Math.random() - 0.5);
-    
-    for (let i = 0; i < numEvents; i++) {
-      const event = shuffled[i];
-      const eventStart = new Date(currentDate);
-      eventStart.setHours(event.hour, 0, 0, 0);
-      
-      const eventEnd = new Date(eventStart);
-      eventEnd.setMinutes(eventEnd.getMinutes() + event.duration);
-      
-      events.push({
-        id: `demo-event-${day}-${i}`,
-        subject: event.subject,
-        bodyPreview: `Demo event for ${event.subject}`,
-        start: {
-          dateTime: eventStart.toISOString(),
-          timeZone: 'UTC',
-        },
-        end: {
-          dateTime: eventEnd.toISOString(),
-          timeZone: 'UTC',
-        },
-        isAllDay: false,
-        organizer: {
-          emailAddress: {
-            name: 'Demo User',
-            address: 'demo@mpbhealth.com',
-          },
-        },
-        showAs: 'busy',
-        importance: 'normal',
-      });
-    }
-  }
-  
-  return events.sort((a, b) => 
-    new Date(a.start.dateTime).getTime() - new Date(b.start.dateTime).getTime()
-  );
-};
+function emptyCalendar(): CalendarEvent[] {
+  return [];
+}
 
 export function useOutlookCalendar(options: UseOutlookCalendarOptions = {}) {
   const { autoRefresh = false } = options;
-  const { user, isDemoMode } = useAuth();
+  const { isDemoMode } = useAuth();
   
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,14 +92,12 @@ export function useOutlookCalendar(options: UseOutlookCalendarOptions = {}) {
       ? { startDate, endDate } 
       : getDefaultDateRange();
 
-    // Demo mode: return demo events
     if (isInDemoMode) {
-      const demoEvents = generateDemoEvents(dateRange.startDate, dateRange.endDate);
-      setEvents(demoEvents);
+      setEvents([]);
       setIsConnected(false);
       setLoading(false);
       setError(null);
-      return demoEvents;
+      return emptyCalendar();
     }
 
     try {
@@ -193,10 +130,9 @@ export function useOutlookCalendar(options: UseOutlookCalendarOptions = {}) {
         throw new Error(data.error);
       }
 
-      if (data.demo) {
-        // Edge function returned demo data (not connected)
+      if (data.connected === false || data.demo) {
         setIsConnected(false);
-        setEvents(data.events || []);
+        setEvents([]);
       } else {
         setIsConnected(true);
         setEvents(data.events || []);
@@ -209,47 +145,17 @@ export function useOutlookCalendar(options: UseOutlookCalendarOptions = {}) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch calendar events';
       setError(errorMessage);
       setSyncStatus('error');
-      
-      // Fall back to demo events on error
-      const demoEvents = generateDemoEvents(dateRange.startDate, dateRange.endDate);
-      setEvents(demoEvents);
+      setEvents([]);
       setIsConnected(false);
-      return demoEvents;
+      return emptyCalendar();
     } finally {
       setLoading(false);
     }
   }, [isInDemoMode, getDefaultDateRange]);
 
   const createEvent = async (eventData: CalendarEventCreate) => {
-    if (isInDemoMode) {
-      // Create a demo event locally
-      const newEvent: CalendarEvent = {
-        id: `demo-event-${Date.now()}`,
-        subject: eventData.subject,
-        bodyPreview: eventData.body,
-        start: {
-          dateTime: eventData.start,
-          timeZone: 'UTC',
-        },
-        end: {
-          dateTime: eventData.end,
-          timeZone: 'UTC',
-        },
-        isAllDay: eventData.isAllDay || false,
-        location: eventData.location ? { displayName: eventData.location } : undefined,
-        organizer: {
-          emailAddress: {
-            name: 'You',
-            address: user?.email || 'demo@mpbhealth.com',
-          },
-        },
-      };
-      
-      setEvents(prev => [...prev, newEvent].sort((a, b) => 
-        new Date(a.start.dateTime).getTime() - new Date(b.start.dateTime).getTime()
-      ));
-      
-      return newEvent;
+    if (isInDemoMode || !isConnected) {
+      throw new Error('Outlook is not connected. Events are not stored locally.');
     }
 
     try {
@@ -287,9 +193,8 @@ export function useOutlookCalendar(options: UseOutlookCalendarOptions = {}) {
   };
 
   const deleteEvent = async (eventId: string) => {
-    if (isInDemoMode) {
-      setEvents(prev => prev.filter(e => e.id !== eventId));
-      return;
+    if (isInDemoMode || !isConnected) {
+      throw new Error('Outlook is not connected. Events are not stored locally.');
     }
 
     try {
@@ -320,20 +225,8 @@ export function useOutlookCalendar(options: UseOutlookCalendarOptions = {}) {
   };
 
   const updateEvent = async (eventId: string, eventData: Partial<CalendarEventCreate>) => {
-    if (isInDemoMode) {
-      // Update the event locally in demo mode
-      setEvents(prev => prev.map(e => {
-        if (e.id !== eventId) return e;
-        return {
-          ...e,
-          subject: eventData.subject || e.subject,
-          start: eventData.start ? { dateTime: eventData.start, timeZone: 'UTC' } : e.start,
-          end: eventData.end ? { dateTime: eventData.end, timeZone: 'UTC' } : e.end,
-          isAllDay: eventData.isAllDay ?? e.isAllDay,
-          location: eventData.location ? { displayName: eventData.location } : e.location,
-        };
-      }));
-      return;
+    if (isInDemoMode || !isConnected) {
+      throw new Error('Outlook is not connected. Events are not stored locally.');
     }
 
     try {

@@ -16,20 +16,13 @@ import {
   RefreshCw,
   X,
   Save,
-  Zap,
-  Mail,
-  MessageSquare,
   Copy
 } from 'lucide-react';
 import { useAssignments } from '../../hooks/useAssignments';
 import { useProjects } from '../../hooks/useSupabaseData';
 import AssignmentForm from '../ui/AssignmentForm';
 import { AssignmentCreateData } from '../../types/Assignment';
-import {
-  sendAssignmentViaTeams,
-  sendAssignmentViaEmail,
-  copyAssignmentToClipboard
-} from '../../utils/communicationHelpers';
+import { copyAssignmentToClipboard } from '../../utils/communicationHelpers';
 
 // Extended assignment type with joined fields from the database query
 interface AssignmentWithDetails {
@@ -57,15 +50,12 @@ export default function Assignments() {
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [selectedAssignee, setSelectedAssignee] = useState('All');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
-  const [activeTab, setActiveTab] = useState<'assignments' | 'monday'>('assignments');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<AssignmentWithDetails | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [sendingId, setSendingId] = useState<string | null>(null);
-  const [sendMethod, setSendMethod] = useState<'teams' | 'email' | null>(null);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
@@ -84,75 +74,16 @@ export default function Assignments() {
     return result.data;
   };
 
-  const handleSendViaTeams = async (assignment: AssignmentWithDetails) => {
-    if (!assignment.employee_email) {
-      alert('No employee email found for this assignment.');
-      return;
-    }
-
-    setSendingId(assignment.id);
-    setSendMethod('teams');
-    setSendSuccess(null);
-    
-    const result = await sendAssignmentViaTeams({
-      assignment,
-      employee: {
-        id: assignment.assigned_to,
-        email: assignment.employee_email,
-        full_name: assignment.employee_name,
-        teams_user_id: assignment.teams_user_id,
-      },
-      projectName: assignment.project_name,
-      senderName: 'MPB Health Dashboard',
-    });
-
-    if (result.success) {
-      setSendSuccess(`Assignment sent via Microsoft Teams to ${assignment.employee_name || assignment.employee_email}!`);
-      setTimeout(() => setSendSuccess(null), 5000);
-    } else {
-      alert(`Failed to send via Teams: ${result.error}`);
-    }
-
-    setSendingId(null);
-    setSendMethod(null);
-  };
-
-  const handleSendViaEmail = async (assignment: AssignmentWithDetails) => {
-    if (!assignment.employee_email) {
-      alert('No employee email found for this assignment.');
-      return;
-    }
-
-    setSendingId(assignment.id);
-    setSendMethod('email');
-    setSendSuccess(null);
-    
-    const result = await sendAssignmentViaEmail({
-      assignment,
-      employee: {
-        id: assignment.assigned_to,
-        email: assignment.employee_email,
-        full_name: assignment.employee_name,
-      },
-      projectName: assignment.project_name,
-      senderName: 'MPB Health Dashboard',
-    });
-
-    if (result.success) {
-      setSendSuccess(`Email client opened for ${assignment.employee_name || assignment.employee_email}!`);
-      setTimeout(() => setSendSuccess(null), 5000);
-    } else {
-      alert(`Failed to send via email: ${result.error}`);
-    }
-
-    setSendingId(null);
-    setSendMethod(null);
-  };
-
   const handleCopyAssignment = async (assignment: AssignmentWithDetails) => {
-    const success = await copyAssignmentToClipboard(assignment, assignment.project_name);
+    const result = await copyAssignmentToClipboard({
+      title: assignment.title,
+      description: assignment.description || undefined,
+      assignedTo: assignment.employee_name || 'Unassigned',
+      dueDate: assignment.due_date || undefined,
+      priority: assignment.priority,
+    });
     
-    if (success) {
+    if (result.success) {
       setSendSuccess('Assignment details copied to clipboard!');
       setTimeout(() => setSendSuccess(null), 3000);
     } else {
@@ -354,30 +285,6 @@ export default function Assignments() {
                 <h4 className="font-medium text-slate-900 text-sm leading-tight">{assignment.title}</h4>
                 <div className="flex items-center space-x-1">
                   <button
-                    onClick={() => handleSendViaTeams(assignment)}
-                    disabled={sendingId === assignment.id && sendMethod === 'teams'}
-                    className="p-1 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors disabled:opacity-50"
-                    title="Send via Microsoft Teams"
-                  >
-                    {sendingId === assignment.id && sendMethod === 'teams' ? (
-                      <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <MessageSquare className="w-4 h-4" />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleSendViaEmail(assignment)}
-                    disabled={sendingId === assignment.id && sendMethod === 'email'}
-                    className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors disabled:opacity-50"
-                    title="Send via Email"
-                  >
-                    {sendingId === assignment.id && sendMethod === 'email' ? (
-                      <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Mail className="w-4 h-4" />
-                    )}
-                  </button>
-                  <button
                     onClick={() => handleCopyAssignment(assignment)}
                     className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
                     title="Copy to Clipboard"
@@ -540,34 +447,7 @@ export default function Assignments() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-        <div className="flex items-center border-b border-slate-200">
-          <button
-            className={`flex items-center space-x-2 px-6 py-4 font-medium text-sm transition-colors border-b-2 ${
-              activeTab === 'assignments'
-                ? 'text-indigo-600 border-indigo-600'
-                : 'text-slate-500 border-transparent hover:text-slate-700 hover:border-slate-300'
-            }`}
-            onClick={() => setActiveTab('assignments')}
-          >
-            <CheckSquare className="w-4 h-4" />
-            <span>My Assignments</span>
-          </button>
-          <button
-            className={`flex items-center space-x-2 px-6 py-4 font-medium text-sm transition-colors border-b-2 ${
-              activeTab === 'monday'
-                ? 'text-indigo-600 border-indigo-600'
-                : 'text-slate-500 border-transparent hover:text-slate-700 hover:border-slate-300'
-            }`}
-            onClick={() => setActiveTab('monday')}
-          >
-            <Zap className="w-4 h-4" />
-            <span>Monday Tasks</span>
-          </button>
-        </div>
-
-        {activeTab === 'assignments' && (
           <div className="p-6">
             {/* Filters */}
             <div className="flex flex-col lg:flex-row gap-4 mb-6">
@@ -707,30 +587,6 @@ export default function Assignments() {
                           </span>
                           <div className="flex items-center space-x-1">
                             <button
-                              onClick={() => handleSendViaTeams(assignment)}
-                              disabled={sendingId === assignment.id && sendMethod === 'teams'}
-                              className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors disabled:opacity-50"
-                              title="Send via Microsoft Teams"
-                            >
-                              {sendingId === assignment.id && sendMethod === 'teams' ? (
-                                <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <MessageSquare className="w-4 h-4" />
-                              )}
-                            </button>
-                            <button
-                              onClick={() => handleSendViaEmail(assignment)}
-                              disabled={sendingId === assignment.id && sendMethod === 'email'}
-                              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors disabled:opacity-50"
-                              title="Send via Email"
-                            >
-                              {sendingId === assignment.id && sendMethod === 'email' ? (
-                                <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <Mail className="w-4 h-4" />
-                              )}
-                            </button>
-                            <button
                               onClick={() => handleCopyAssignment(assignment)}
                               className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
                               title="Copy to Clipboard"
@@ -778,17 +634,6 @@ export default function Assignments() {
               </div>
             )}
           </div>
-        )}
-
-        {activeTab === 'monday' && (
-          <div className="p-6">
-            <div className="text-center py-12">
-              <Zap className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-600 mb-4">Monday.com tasks integration</p>
-              <p className="text-sm text-slate-500">Monday tasks will be displayed here based on the selected project.</p>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Assignment Form Modal */}

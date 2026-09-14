@@ -59,71 +59,6 @@ interface CalendarEvent {
   importance?: string;
 }
 
-// Generate demo calendar events
-function generateDemoEvents(startDate: string, endDate: string): CalendarEvent[] {
-  const events: CalendarEvent[] = [];
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  
-  const sampleEvents = [
-    { subject: 'Team Standup', duration: 30, hour: 9 },
-    { subject: 'Project Review', duration: 60, hour: 14 },
-    { subject: 'Client Call', duration: 45, hour: 11 },
-    { subject: 'Sprint Planning', duration: 120, hour: 10 },
-    { subject: '1:1 with Manager', duration: 30, hour: 15 },
-    { subject: 'Strategy Meeting', duration: 90, hour: 13 },
-  ];
-
-  const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-  
-  for (let day = 0; day < daysDiff; day++) {
-    const currentDate = new Date(start);
-    currentDate.setDate(currentDate.getDate() + day);
-    
-    // Skip weekends
-    if (currentDate.getDay() === 0 || currentDate.getDay() === 6) continue;
-    
-    const numEvents = Math.floor(Math.random() * 2) + 2;
-    const shuffled = [...sampleEvents].sort(() => Math.random() - 0.5);
-    
-    for (let i = 0; i < numEvents; i++) {
-      const event = shuffled[i];
-      const eventStart = new Date(currentDate);
-      eventStart.setHours(event.hour, 0, 0, 0);
-      
-      const eventEnd = new Date(eventStart);
-      eventEnd.setMinutes(eventEnd.getMinutes() + event.duration);
-      
-      events.push({
-        id: `demo-event-${day}-${i}`,
-        subject: event.subject,
-        bodyPreview: `Demo event for ${event.subject}`,
-        start: {
-          dateTime: eventStart.toISOString(),
-          timeZone: 'UTC',
-        },
-        end: {
-          dateTime: eventEnd.toISOString(),
-          timeZone: 'UTC',
-        },
-        isAllDay: false,
-        organizer: {
-          emailAddress: {
-            name: 'Demo User',
-            address: 'demo@mpbhealth.com',
-          },
-        },
-        showAs: 'busy',
-        importance: 'normal',
-      });
-    }
-  }
-  
-  return events.sort((a, b) => 
-    new Date(a.start.dateTime).getTime() - new Date(b.start.dateTime).getTime()
-  );
-}
-
 async function getAccessToken(config: OutlookConfig): Promise<string> {
   // Check if current token is still valid
   if (config.access_token && config.token_expires_at) {
@@ -405,28 +340,23 @@ Deno.serve(async (req: Request) => {
       .limit(1);
     const { action, startDate, endDate, event, eventId } = body;
 
-    // If no config exists, return demo data
     if (configError || !configs || configs.length === 0) {
       if (action === 'getEvents') {
-        const demoEvents = generateDemoEvents(
-          startDate || new Date().toISOString(),
-          endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-        );
-        
-        return new Response(JSON.stringify({ 
-          demo: true, 
-          events: demoEvents,
-          message: 'Outlook not configured - showing demo data'
+        return new Response(JSON.stringify({
+          connected: false,
+          events: [],
+          message: 'Outlook is not configured',
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      return new Response(JSON.stringify({ 
-        demo: true, 
-        message: 'Outlook not configured - operation simulated',
-        success: true
+      return new Response(JSON.stringify({
+        connected: false,
+        success: false,
+        error: 'Outlook is not configured',
       }), {
+        status: 409,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

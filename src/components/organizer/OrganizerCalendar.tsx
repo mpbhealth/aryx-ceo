@@ -29,7 +29,6 @@ export default function OrganizerCalendar({ compact = false }: OrganizerCalendar
     loading,
     error,
     isConnected,
-    isInDemoMode,
     syncStatus: _syncStatus,
     fetchEvents,
     createEvent,
@@ -159,7 +158,7 @@ export default function OrganizerCalendar({ compact = false }: OrganizerCalendar
           </div>
           <div className="flex items-center space-x-2">
             {!isConnected && (
-              <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">Demo</span>
+              <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">Not connected</span>
             )}
             <button
               onClick={refresh}
@@ -217,7 +216,7 @@ export default function OrganizerCalendar({ compact = false }: OrganizerCalendar
                 className="text-xs text-amber-600 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded flex items-center space-x-1 transition-colors cursor-pointer"
               >
                 <Link2 className="w-3 h-3" />
-                <span>{isInDemoMode ? 'Demo Mode' : 'Connect Outlook'}</span>
+                <span>Not connected</span>
               </button>
             )}
             {isConnected && (
@@ -226,13 +225,15 @@ export default function OrganizerCalendar({ compact = false }: OrganizerCalendar
                 <span>Outlook synced</span>
               </span>
             )}
-            <button
-              onClick={() => setShowAddEvent(true)}
-              className="flex items-center space-x-1 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Event</span>
-            </button>
+            {isConnected && (
+              <button
+                onClick={() => setShowAddEvent(true)}
+                className="flex items-center space-x-1 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Event</span>
+              </button>
+            )}
             {!isConnected && (
               <button
                 onClick={() => setShowOutlookSetup(true)}
