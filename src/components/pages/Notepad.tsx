@@ -13,6 +13,8 @@ import {
   Edit3
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { useOrg } from '../../contexts/OrgContext';
 
 interface Note {
   id: string;
@@ -23,6 +25,8 @@ interface Note {
 }
 
 export default function Notepad() {
+  const { user } = useAuth();
+  const { orgId } = useOrg();
   const [notes, setNotes] = useState<Note[]>([]);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
@@ -37,7 +41,7 @@ export default function Notepad() {
 
   useEffect(() => {
     fetchNotes();
-  }, []);
+  }, [orgId]);
 
   // Reset success message after 3 seconds
   useEffect(() => {
@@ -50,15 +54,21 @@ export default function Notepad() {
   }, [saveSuccess]);
 
   const fetchNotes = async () => {
+    if (!orgId) {
+      setNotes([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const { data: notes, error } = await supabase
+      const { data: rows, error } = await supabase
         .from('notes')
-        .select('*')
+        .select('id, content, created_at, updated_at, created_by, owner_user_id')
+        .eq('org_id', orgId)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      setNotes(notes || []);
+      setNotes(rows || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch notes');
     } finally {
@@ -72,17 +82,19 @@ export default function Notepad() {
     try {
       setSaving(true);
       
-      // Get current user ID
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // Insert note into database
+      if (!orgId) throw new Error('No active organization');
+      if (!user?.id) throw new Error('Not signed in');
+
       const { data, error } = await supabase
         .from('notes')
-        .insert([{ 
+        .insert([{
+          org_id: orgId,
           content,
-          user_id: user?.id
+          created_by: user.id,
+          owner_user_id: user.id,
+          owner_role: 'cos',
         }])
-        .select();
+        .select('id, content, created_at, updated_at, created_by, owner_user_id');
       
       if (error) throw error;
       

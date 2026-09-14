@@ -20,7 +20,9 @@ function toTaskStatus(status: string | null | undefined): 'open' | 'in_progress'
   return 'open';
 }
 
-function mapTask(row: Record<string, unknown>): Assignment {
+type AssignmentRow = Assignment & { employee_name?: string };
+
+function mapTask(row: Record<string, unknown>, employeeName?: string): AssignmentRow {
   return {
     id: String(row.id),
     title: String(row.title || ''),
@@ -32,6 +34,7 @@ function mapTask(row: Record<string, unknown>): Assignment {
     project_id: (row.project_id as string) || undefined,
     created_at: row.created_at as string | undefined,
     updated_at: row.updated_at as string | undefined,
+    employee_name: employeeName,
   };
 }
 
@@ -44,7 +47,7 @@ interface MutationResult {
 export function useAssignments() {
   const { user } = useAuth();
   const { orgId } = useOrg();
-  const [data, setData] = useState<Assignment[]>([]);
+  const [data, setData] = useState<AssignmentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,13 +60,20 @@ export function useAssignments() {
     try {
       setLoading(true);
       setError(null);
-      const { data: rows, error: queryError } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('org_id', orgId)
-        .order('created_at', { ascending: false });
+      const [{ data: rows, error: queryError }, { data: people }] = await Promise.all([
+        supabase.from('tasks').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
+        supabase.from('employee_profiles').select('user_id, first_name, last_name').eq('org_id', orgId),
+      ]);
       if (queryError) throw queryError;
-      setData((rows || []).map((row) => mapTask(row as Record<string, unknown>)));
+      const names = new Map(
+        (people || [])
+          .filter((row) => row.user_id)
+          .map((row) => [String(row.user_id), `${row.first_name} ${row.last_name}`.trim()]),
+      );
+      setData((rows || []).map((row) => {
+        const owner = row.owner_user_id ? names.get(String(row.owner_user_id)) : undefined;
+        return mapTask(row as Record<string, unknown>, owner);
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch assignments');
     } finally {

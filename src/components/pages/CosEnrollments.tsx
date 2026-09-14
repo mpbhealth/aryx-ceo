@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { compactNumber, money, periodBounds, type PeriodKey } from '@/lib/cos';
+import { formatFact } from '@/lib/marketingFacts';
 import { computeForecast, preferCompleteMonth } from '@/lib/forecast';
 import { useOrg } from '@/contexts/OrgContext';
 import { OrgPicker } from '../cos/OrgPicker';
@@ -61,6 +62,21 @@ export function CosEnrollments() {
       if (trend.error) throw trend.error;
       if (risk.error) throw risk.error;
       return { trend: trend.data || [], risk: risk.data || [] };
+    },
+  });
+
+  const cohorts = useQuery({
+    queryKey: ['enroll-iq-cohorts', orgIds.join(',')],
+    enabled: orgIds.length > 0 && linked.advisoriq,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fact_iq_cohorts')
+        .select('cohort_month, cohort_size, retained, retention_pct')
+        .in('org_id', orgIds)
+        .order('cohort_month', { ascending: false })
+        .limit(12);
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -148,9 +164,9 @@ export function CosEnrollments() {
       />
       {linked.enrollment && (
       <CommandStrip title="Period totals">
-        <CommandStat label="New" value={compactNumber(totals.neu)} />
-        <CommandStat label="Inactive" value={compactNumber(totals.inactive)} />
-        <CommandStat label="Net adds" value={compactNumber(totals.neu - totals.inactive)} />
+        <CommandStat label="New" value={formatFact(compactNumber, { linked: linked.enrollment, loading: rows.isLoading, hasRows: (rows.data || []).length > 0, value: totals.neu })} />
+        <CommandStat label="Inactive" value={formatFact(compactNumber, { linked: linked.enrollment, loading: rows.isLoading, hasRows: (rows.data || []).length > 0, value: totals.inactive })} />
+        <CommandStat label="Net adds" value={formatFact(compactNumber, { linked: linked.enrollment, loading: rows.isLoading, hasRows: (rows.data || []).length > 0, value: totals.neu - totals.inactive })} />
       </CommandStrip>
       )}
       {linked.enrollment && projection && (
@@ -171,6 +187,20 @@ export function CosEnrollments() {
       {linked.advisoriq && tideHistory.length > 0 && (
         <div className="mt-8">
           <MovementTide history={tideHistory} />
+        </div>
+      )}
+      {linked.advisoriq && (cohorts.data || []).length > 0 && (
+        <div className="mt-8">
+          <CommandStrip title="AdvisorIQ cohorts">
+            {(cohorts.data || []).slice(0, 6).map((row) => (
+              <CommandStat
+                key={row.cohort_month}
+                label={String(row.cohort_month).slice(0, 7)}
+                value={`${compactNumber(row.retained)}/${compactNumber(row.cohort_size)}`}
+                hint={`${Number(row.retention_pct || 0).toFixed(0)}% retained`}
+              />
+            ))}
+          </CommandStrip>
         </div>
       )}
       {linked.advisoriq && (iqBook.data?.risk || []).length > 0 && (

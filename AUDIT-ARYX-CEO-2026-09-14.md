@@ -17,7 +17,9 @@ Untouched this pass: Inbox Graph mail end-to-end, CRM write-proxy live POST, pas
 
 ## RESUME HERE
 
-Next: confirm this commit is the promoted Vercel production SHA, add `https://ceo.aryx.pro` in Supabase Auth URL config, map a real MarketFlow team id when one exists. Do not invent one.
+Pass 2 closed notes `org_id` writes, Staff vs missing performance tables, mock policy history, unused `fact_iq_cohorts`, org-scoped people/depts/policies, assignment names.
+
+Still not ours: Auth Site URL dashboard click, MarketFlow team id, Outlook Graph store, isolation org.
 
 ## Drift Register
 

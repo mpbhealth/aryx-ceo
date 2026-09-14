@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { shouldQueryCosTable } from '../lib/schema/cosPublicTables';
+import { useOrg } from '../contexts/OrgContext';
 
 export interface Department {
   id: string;
@@ -51,12 +52,13 @@ export interface EmployeeProfile {
 }
 
 export function useDepartments() {
+  const { orgId } = useOrg();
   const [data, setData] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchDepartments = useCallback(async () => {
-    if (!shouldQueryCosTable('departments')) {
+    if (!shouldQueryCosTable('departments') || !orgId) {
       setData([]);
       setError(null);
       setLoading(false);
@@ -67,6 +69,7 @@ export function useDepartments() {
       const { data: departments, error: deptError } = await supabase
         .from('departments')
         .select('*')
+        .eq('org_id', orgId)
         .order('name', { ascending: true });
 
       if (deptError) throw deptError;
@@ -77,7 +80,7 @@ export function useDepartments() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [orgId]);
 
   useEffect(() => {
     fetchDepartments();
@@ -105,12 +108,13 @@ export function useDepartments() {
 }
 
 export function useEmployeeProfiles() {
+  const { orgId } = useOrg();
   const [data, setData] = useState<EmployeeProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchEmployees = useCallback(async () => {
-    if (!shouldQueryCosTable('employee_profiles')) {
+    if (!shouldQueryCosTable('employee_profiles') || !orgId) {
       setData([]);
       setError(null);
       setLoading(false);
@@ -121,6 +125,7 @@ export function useEmployeeProfiles() {
       const { data: employees, error: empError } = await supabase
         .from('employee_profiles')
         .select('*')
+        .eq('org_id', orgId)
         .order('last_name', { ascending: true });
 
       if (empError) throw empError;
@@ -131,7 +136,7 @@ export function useEmployeeProfiles() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [orgId]);
 
   useEffect(() => {
     fetchEmployees();
@@ -224,12 +229,13 @@ interface PolicyDocument {
 }
 
 export function usePolicyDocuments() {
+  const { orgId } = useOrg();
   const [data, setData] = useState<PolicyDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    if (!shouldQueryCosTable('policies')) {
+    if (!shouldQueryCosTable('policies') || !orgId) {
       setData([]);
       setError(null);
       setLoading(false);
@@ -240,6 +246,7 @@ export function usePolicyDocuments() {
       const { data: policies, error: policiesError } = await supabase
         .from('policies')
         .select('*')
+        .eq('org_id', orgId)
         .order('created_at', { ascending: false });
 
       if (policiesError) throw policiesError;
@@ -254,7 +261,7 @@ export function usePolicyDocuments() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [orgId]);
 
   useEffect(() => {
     fetchData();
@@ -351,6 +358,9 @@ export function useOrgChartPositions() {
   }, [fetchPositions]);
 
   const updatePosition = useCallback(async (departmentId: string, x: number, y: number) => {
+    if (!shouldQueryCosTable('org_chart_positions')) {
+      throw new Error('Org chart layout is not stored on this project.');
+    }
     try {
       const { error: updateError } = await supabase
         .from('org_chart_positions')
@@ -382,6 +392,9 @@ export function useOrgChartPositions() {
   }, []);
 
   const saveLayout = useCallback(async () => {
+    if (!shouldQueryCosTable('org_chart_positions')) {
+      throw new Error('Org chart layout is not stored on this project.');
+    }
     try {
       const timestamp = new Date().toISOString();
       const updates = data.map(pos => ({
@@ -402,6 +415,9 @@ export function useOrgChartPositions() {
   }, [data]);
 
   const resetLayout = useCallback(async () => {
+    if (!shouldQueryCosTable('org_chart_positions')) {
+      throw new Error('Org chart layout is not stored on this project.');
+    }
     try {
       const { error: deleteError } = await supabase
         .from('org_chart_positions')

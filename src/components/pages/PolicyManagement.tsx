@@ -15,7 +15,6 @@ import {
   AlertCircle,
   User,
   X,
-  History,
   Eye,
   Building2
 } from 'lucide-react';
@@ -27,15 +26,6 @@ import { Database } from '../../types/database';
 
 type PolicyDocument = Database['public']['Tables']['policy_documents']['Row'];
 
-interface PolicyHistoryItem {
-  id: string;
-  version: string;
-  status: string;
-  modified_by: string;
-  modified_at: string;
-  changes: string;
-}
-
 export default function PolicyManagement() {
   const { data: policies, loading: policiesLoading, error: policiesError, refetch: refetchPolicies } = usePolicyDocuments();
   const { data: departments, loading: departmentsLoading } = useDepartments();
@@ -46,10 +36,7 @@ export default function PolicyManagement() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedPolicy, setExpandedPolicy] = useState<string | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
-  const [selectedPolicyForHistory, setSelectedPolicyForHistory] = useState<PolicyDocument | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [policyHistory, setPolicyHistory] = useState<PolicyHistoryItem[]>([]);
 
   const loading = policiesLoading || departmentsLoading;
   const error = policiesError;
@@ -117,39 +104,6 @@ Last Updated: ${new Date(policy.updated_at).toLocaleDateString()}
     } finally {
       setDownloadingId(null);
     }
-  };
-
-  const viewPolicyHistory = async (policy: PolicyDocument) => {
-    setSelectedPolicyForHistory(policy);
-    setShowHistory(true);
-    
-    // Mock history data - in real implementation, this would come from a policy_history table
-    setPolicyHistory([
-      {
-        id: '1',
-        version: policy.version,
-        status: policy.status,
-        modified_by: 'Current Version',
-        modified_at: policy.updated_at,
-        changes: 'Current active version'
-      },
-      {
-        id: '2',
-        version: '1.0',
-        status: 'archived',
-        modified_by: 'Vinnie R. Tannous',
-        modified_at: '2024-01-15T10:00:00Z',
-        changes: 'Initial policy creation and approval'
-      },
-      {
-        id: '3',
-        version: '0.9',
-        status: 'draft',
-        modified_by: 'Sarah Johnson',
-        modified_at: '2024-01-10T09:30:00Z',
-        changes: 'Draft version with initial requirements'
-      }
-    ]);
   };
 
   const getDepartmentName = (departmentId: string | null) => {
@@ -355,13 +309,6 @@ Last Updated: ${new Date(policy.updated_at).toLocaleDateString()}
                       )}
                     </button>
                     <button
-                      onClick={() => viewPolicyHistory(policy)}
-                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                      title="View policy history"
-                    >
-                      <History className="w-4 h-4" />
-                    </button>
-                    <button
                       className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                       title="Edit policy"
                     >
@@ -465,83 +412,6 @@ Last Updated: ${new Date(policy.updated_at).toLocaleDateString()}
             <Plus className="w-4 h-4" />
             <span>Create New Policy</span>
           </button>
-        </div>
-      )}
-
-      {/* Policy History Modal */}
-      {showHistory && selectedPolicyForHistory && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="cos-modal bg-white rounded-xl shadow-xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-slate-200">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <History className="w-5 h-5 text-indigo-600" />
-                </div>
-                <h2 className="text-xl font-semibold text-slate-900">
-                  Policy History: {selectedPolicyForHistory.title}
-                </h2>
-              </div>
-              <button
-                onClick={() => {
-                  setShowHistory(false);
-                  setSelectedPolicyForHistory(null);
-                }}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6">
-              <div className="space-y-4">
-                {policyHistory.map((version, index) => (
-                  <div key={version.id} className="flex items-start space-x-4 p-4 border border-slate-200 rounded-lg">
-                    <div className="flex-shrink-0">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        index === 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        <span className="text-xs font-medium">v{version.version}</span>
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium text-slate-900">Version {version.version}</h4>
-                        <div className="flex items-center space-x-2">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(version.status)}`}>
-                            {version.status}
-                          </span>
-                          <span className="text-sm text-slate-500">
-                            {new Date(version.modified_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="text-sm text-slate-600 mb-2">{version.changes}</p>
-                      <div className="flex items-center space-x-2 text-xs text-slate-500">
-                        <User className="w-3 h-3" />
-                        <span>Modified by {version.modified_by}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => alert(`Viewing version ${version.version}`)}
-                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                        title="View this version"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => downloadPolicy({...selectedPolicyForHistory, version: version.version})}
-                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                        title="Download this version"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
         </div>
       )}
 

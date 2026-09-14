@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useOrg } from '../contexts/OrgContext';
 
 export interface Note {
   id: string;
@@ -93,6 +94,7 @@ function saveDemoNotes(dashboardRole: 'ceo' | 'cto' | 'cos', notes: Note[]): voi
 export function useNotes(options: UseNotesOptions) {
   const { dashboardRole, autoRefresh = false } = options;
   const { user, isDemoMode } = useAuth();
+  const { orgId } = useOrg();
   const [notes, setNotes] = useState<Note[]>([]);
   const [sharedNotes, setSharedNotes] = useState<Note[]>([]);
   const [notifications, setNotifications] = useState<NoteNotification[]>([]);
@@ -116,12 +118,12 @@ export function useNotes(options: UseNotesOptions) {
     if (!user) throw new Error('Not authenticated');
     if (isInDemoMode) return loadDemoNotes(dashboardRole);
 
-    // Try fetching with the enhanced schema first
+    if (!orgId) return [];
+
     const initialResult = await supabase
       .from('notes')
       .select('*')
-      .eq('created_by', user.id)
-      .eq('owner_role', dashboardRole)
+      .eq('org_id', orgId)
       .order('created_at', { ascending: false });
 
     let data = initialResult.data;
@@ -153,69 +155,9 @@ export function useNotes(options: UseNotesOptions) {
     return data || [];
   };
 
-  const fetchSharedNotes = async () => {
-    if (!user) throw new Error('Not authenticated');
-    if (isInDemoMode) return [];
+  const fetchSharedNotes = async () => [];
 
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('notes')
-        .select(`
-          *,
-          note_shares!inner(
-            shared_by_user_id,
-            shared_with_user_id,
-            permission_level,
-            share_message
-          )
-        `)
-        .eq('note_shares.shared_with_user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      // If note_shares table doesn't exist, return empty array
-      if (fetchError) {
-        if (fetchError.message.includes('note_shares') || fetchError.code === '42P01') {
-          console.warn('[useNotes] note_shares table not found - sharing features disabled');
-          return [];
-        }
-        throw fetchError;
-      }
-      return data || [];
-    } catch (err) {
-      console.warn('[useNotes] Error fetching shared notes:', err);
-      return [];
-    }
-  };
-
-  const fetchNotifications = async () => {
-    if (!user) throw new Error('Not authenticated');
-    if (isInDemoMode) return [];
-
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('note_notifications')
-        .select(`
-          *,
-          notes(*)
-        `)
-        .eq('recipient_user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      // If note_notifications table doesn't exist, return empty array
-      if (fetchError) {
-        if (fetchError.message.includes('note_notifications') || fetchError.code === '42P01') {
-          console.warn('[useNotes] note_notifications table not found - notifications disabled');
-          return [];
-        }
-        throw fetchError;
-      }
-      return data || [];
-    } catch (err) {
-      console.warn('[useNotes] Error fetching notifications:', err);
-      return [];
-    }
-  };
+  const fetchNotifications = async () => [];
 
   const fetchAllNotes = useCallback(async () => {
     // In demo mode, use local storage
@@ -280,7 +222,7 @@ export function useNotes(options: UseNotesOptions) {
         subscription.unsubscribe();
       };
     }
-  }, [dashboardRole, autoRefresh, isInDemoMode, fetchAllNotes]);
+  }, [dashboardRole, autoRefresh, isInDemoMode, orgId, fetchAllNotes]);
 
   const createNote = async (
     content: string,
@@ -318,14 +260,18 @@ export function useNotes(options: UseNotesOptions) {
       return newNote;
     }
 
+    if (!orgId) throw new Error('No active organization');
+
     const noteData = {
+      org_id: orgId,
       content,
       title: options?.title || null,
       owner_role: dashboardRole,
       created_for_role: options?.createdForRole || null,
       created_by: user.id,
-      is_shared: options?.shareImmediately || false,
-      is_collaborative: options?.permissionLevel === 'edit' || false
+      owner_user_id: user.id,
+      is_shared: false,
+      is_collaborative: false,
     };
 
     const { data, error: insertError } = await supabase
@@ -335,15 +281,6 @@ export function useNotes(options: UseNotesOptions) {
       .single();
 
     if (insertError) throw insertError;
-
-    if (options?.shareImmediately && options?.createdForRole) {
-      await shareNoteWithRole(
-        data.id,
-        options.createdForRole,
-        options.permissionLevel || 'view',
-        options.shareMessage
-      );
-    }
 
     await fetchAllNotes();
     return data;

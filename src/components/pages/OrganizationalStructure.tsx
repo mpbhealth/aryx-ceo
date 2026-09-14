@@ -393,16 +393,9 @@ export default function OrganizationalStructure() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-slate-900">Interactive Organization Chart</h2>
               <div className="flex items-center space-x-3">
-                <button 
-                  onClick={toggleEditMode}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all text-sm font-medium ${
-                    isEditMode 
-                      ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}>
-                  {isEditMode ? <Save className="w-4 h-4" /> : <Edit className="w-4 h-4" />}
-                  <span>{isEditMode ? 'Save Layout' : 'Edit Layout'}</span>
-                </button>
+                <p className="text-sm text-slate-500">
+                  Chart uses department parents and reporting lines. Dragged layout is not stored on this project.
+                </p>
               </div>
             </div>
             
@@ -412,7 +405,7 @@ export default function OrganizationalStructure() {
               relationships={relationships}
               positions={positions}
               onPositionUpdate={updatePosition}
-              isEditMode={isEditMode}
+              isEditMode={false}
               onSaveLayout={handleSaveLayout}
               onResetLayout={handleResetLayout}
               onDepartmentSelect={handleDepartmentSelect}

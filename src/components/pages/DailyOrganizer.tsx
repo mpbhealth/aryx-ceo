@@ -2,14 +2,10 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   LayoutGrid,
-  Calendar,
-  StickyNote,
-  CheckSquare,
   Clock,
   RefreshCw,
   Maximize2,
   Minimize2,
-  Settings
 } from 'lucide-react';
 import OrganizerCalendar from '../organizer/OrganizerCalendar';
 import OrganizerNotes from '../organizer/OrganizerNotes';
@@ -21,6 +17,7 @@ interface DailyOrganizerProps {
 
 export default function DailyOrganizer({ dashboardRole }: DailyOrganizerProps) {
   const [expandedWidget, setExpandedWidget] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const today = new Date();
@@ -31,13 +28,10 @@ export default function DailyOrganizer({ dashboardRole }: DailyOrganizerProps) {
     day: 'numeric',
   });
 
-  const handleRefreshAll = async () => {
+  const handleRefreshAll = () => {
     setIsRefreshing(true);
-    // Small delay to show the animation
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    setRefreshKey((key) => key + 1);
     setIsRefreshing(false);
-    // The individual components will refresh via their hooks
-    window.location.reload();
   };
 
   const toggleExpand = (widgetId: string) => {
@@ -78,69 +72,6 @@ export default function DailyOrganizer({ dashboardRole }: DailyOrganizerProps) {
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-gradient-to-br from-sky-500 to-sky-600 p-4 rounded-xl text-white shadow-lg"
-        >
-          <div className="flex items-center space-x-3">
-            <Calendar className="w-8 h-8 opacity-80" />
-            <div>
-              <p className="text-sky-100 text-sm">Calendar Events</p>
-              <p className="text-2xl font-bold">Today</p>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 rounded-xl text-white shadow-lg"
-        >
-          <div className="flex items-center space-x-3">
-            <CheckSquare className="w-8 h-8 opacity-80" />
-            <div>
-              <p className="text-indigo-100 text-sm">Tasks Due</p>
-              <p className="text-2xl font-bold">Priority</p>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="bg-gradient-to-br from-amber-500 to-amber-600 p-4 rounded-xl text-white shadow-lg"
-        >
-          <div className="flex items-center space-x-3">
-            <StickyNote className="w-8 h-8 opacity-80" />
-            <div>
-              <p className="text-amber-100 text-sm">Quick Notes</p>
-              <p className="text-2xl font-bold">Access</p>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-4 rounded-xl text-white shadow-lg"
-        >
-          <div className="flex items-center space-x-3">
-            <Settings className="w-8 h-8 opacity-80" />
-            <div>
-              <p className="text-emerald-100 text-sm">Work Mode</p>
-              <p className="text-2xl font-bold">{dashboardRole.toUpperCase()}</p>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-
       {/* Main Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calendar - Takes 2 columns on large screens */}
@@ -164,7 +95,7 @@ export default function DailyOrganizer({ dashboardRole }: DailyOrganizerProps) {
                 <Maximize2 className="w-4 h-4" />
               )}
             </button>
-            <OrganizerCalendar />
+            <OrganizerCalendar key={`cal-${refreshKey}`} />
           </div>
         </motion.div>
 
@@ -194,7 +125,7 @@ export default function DailyOrganizer({ dashboardRole }: DailyOrganizerProps) {
                 <Maximize2 className="w-4 h-4" />
               )}
             </button>
-            <OrganizerNotes dashboardRole={dashboardRole} maxNotes={expandedWidget === 'notes' ? 10 : 5} />
+            <OrganizerNotes key={`notes-${refreshKey}`} dashboardRole={dashboardRole} maxNotes={expandedWidget === 'notes' ? 10 : 5} />
           </div>
 
           {/* Tasks Widget */}
@@ -214,7 +145,7 @@ export default function DailyOrganizer({ dashboardRole }: DailyOrganizerProps) {
                 <Maximize2 className="w-4 h-4" />
               )}
             </button>
-            <OrganizerTasks maxTasks={expandedWidget === 'tasks' ? 10 : 5} />
+            <OrganizerTasks key={`tasks-${refreshKey}`} maxTasks={expandedWidget === 'tasks' ? 10 : 5} />
           </div>
         </motion.div>
       </div>

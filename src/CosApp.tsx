@@ -12,7 +12,6 @@ import { InstallAppBanner } from './components/ui/InstallAppBanner';
 import { remapLegacyPath } from './lib/cos';
 import { ThemeToggle } from './components/brand/ThemeToggle';
 import { OrgProvider, useOrg } from './contexts/OrgContext';
-import { AIAssistantProvider } from './providers/AIAssistantProvider';
 
 const CosHome = lazy(() => import('./components/pages/CosHome'));
 const CosInbox = lazy(() => import('./components/pages/CosInbox'));
@@ -42,7 +41,7 @@ const Assignments = lazy(() => import('./components/pages/Assignments'));
 const Notepad = lazy(() => import('./components/pages/Notepad'));
 
 const Operations = lazy(() => import('./components/pages/CosOperations'));
-const EmployeePerformance = lazy(() => import('./components/pages/EmployeePerformance'));
+const EmployeePerformance = lazy(() => import('./components/pages/CosStaff'));
 const SaaSSpend = lazy(() => import('./components/pages/SaaSSpend'));
 const PolicyManagement = lazy(() => import('./components/pages/PolicyManagement'));
 const OrganizationalStructure = lazy(() => import('./components/pages/OrganizationalStructure'));
@@ -221,16 +220,14 @@ function CosContent() {
 
 export default function CosApp() {
   return (
-    <AIAssistantProvider>
-      <AppShell>
-        <OrgProvider>
-          <CosContent />
-        </OrgProvider>
-        <KeyboardShortcutsModal />
-        <SessionTimeoutWarning />
-        <UpdateBanner />
-        <InstallAppBanner />
-      </AppShell>
-    </AIAssistantProvider>
+    <AppShell>
+      <OrgProvider>
+        <CosContent />
+      </OrgProvider>
+      <KeyboardShortcutsModal />
+      <SessionTimeoutWarning />
+      <UpdateBanner />
+      <InstallAppBanner />
+    </AppShell>
   );
 }
