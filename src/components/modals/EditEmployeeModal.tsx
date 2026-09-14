@@ -18,7 +18,6 @@ interface Employee {
   location?: string;
   start_date?: string;
   skills?: string[];
-  certifications?: string[];
 }
 
 interface EditEmployeeModalProps {
@@ -52,7 +51,6 @@ export default function EditEmployeeModal({
     location: '',
     start_date: '',
     skills: '',
-    certifications: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +72,6 @@ export default function EditEmployeeModal({
         location: employee.location || '',
         start_date: employee.start_date ? employee.start_date.split('T')[0] : '',
         skills: employee.skills?.join(', ') || '',
-        certifications: employee.certifications?.join(', ') || ''
       });
       setError(null);
     }
@@ -367,44 +364,25 @@ export default function EditEmployeeModal({
               </div>
             </div>
 
-            {/* Skills and Certifications */}
             <div className="md:col-span-2">
               <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
                 <span className="w-1 h-5 bg-emerald-500 rounded-full mr-2"></span>
-                Skills & Certifications
+                Skills
               </h3>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="skills" className="block text-sm font-medium text-slate-700 mb-1">
-                    Skills
-                  </label>
-                  <textarea
-                    id="skills"
-                    name="skills"
-                    rows={2}
-                    value={formData.skills}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                    placeholder="JavaScript, React, Project Management"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Separate multiple skills with commas</p>
-                </div>
-
-                <div>
-                  <label htmlFor="certifications" className="block text-sm font-medium text-slate-700 mb-1">
-                    Certifications
-                  </label>
-                  <textarea
-                    id="certifications"
-                    name="certifications"
-                    rows={2}
-                    value={formData.certifications}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                    placeholder="AWS Certified, PMP, CISSP"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Separate multiple certifications with commas</p>
-                </div>
+              <div>
+                <label htmlFor="skills" className="block text-sm font-medium text-slate-700 mb-1">
+                  Skills
+                </label>
+                <textarea
+                  id="skills"
+                  name="skills"
+                  rows={2}
+                  value={formData.skills}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                  placeholder="JavaScript, React, Project Management"
+                />
+                <p className="text-xs text-slate-500 mt-1">Separate multiple skills with commas</p>
               </div>
             </div>
           </div>

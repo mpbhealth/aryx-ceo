@@ -20,13 +20,8 @@ export default function AddDepartmentModal({ onClose, onSuccess, departments, em
     code: '',
     parent_department_id: '',
     department_lead_id: '',
-    strategic_purpose: '',
     location: '',
     contact_email: '',
-    mission_statement: '',
-    key_objectives: '',
-    tech_stack: '',
-    reporting_frequency: 'weekly',
     budget_allocated: '',
     headcount: '0'
   });
@@ -46,6 +41,8 @@ export default function AddDepartmentModal({ onClose, onSuccess, departments, em
         return;
       }
       
+      if (!orgId) throw new Error('No active organization');
+
       const departmentData = {
         org_id: orgId,
         name: formData.name.trim(),
@@ -64,6 +61,7 @@ export default function AddDepartmentModal({ onClose, onSuccess, departments, em
       const { data: existingDepts, error: checkError } = await supabase
         .from('departments')
         .select('name')
+        .eq('org_id', orgId)
         .eq('name', formData.name.trim());
       
       if (checkError) throw checkError;
@@ -242,24 +240,6 @@ export default function AddDepartmentModal({ onClose, onSuccess, departments, em
             </div>
 
             <div>
-              <label htmlFor="reporting_frequency" className="block text-sm font-medium text-slate-700 mb-2">
-                Reporting Frequency
-              </label>
-              <select
-                id="reporting_frequency"
-                name="reporting_frequency"
-                value={formData.reporting_frequency}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-indigo-500"
-              >
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="quarterly">Quarterly</option>
-              </select>
-            </div>
-
-            <div>
               <label htmlFor="location" className="block text-sm font-medium text-slate-700 mb-2">
                 Location
               </label>
@@ -292,36 +272,6 @@ export default function AddDepartmentModal({ onClose, onSuccess, departments, em
           </div>
 
           <div>
-            <label htmlFor="strategic_purpose" className="block text-sm font-medium text-slate-700 mb-2">
-              Strategic Purpose
-            </label>
-            <textarea
-              id="strategic_purpose"
-              name="strategic_purpose"
-              value={formData.strategic_purpose}
-              onChange={handleInputChange}
-              rows={3}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-indigo-500"
-              placeholder="Strategic purpose and goals"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="mission_statement" className="block text-sm font-medium text-slate-700 mb-2">
-              Mission Statement
-            </label>
-            <textarea
-              id="mission_statement"
-              name="mission_statement"
-              value={formData.mission_statement}
-              onChange={handleInputChange}
-              rows={3}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-indigo-500"
-              placeholder="Department mission statement"
-            />
-          </div>
-
-          <div>
             <label htmlFor="headcount" className="block text-sm font-medium text-slate-700 mb-2">
               Headcount
             </label>
@@ -335,22 +285,6 @@ export default function AddDepartmentModal({ onClose, onSuccess, departments, em
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-indigo-500"
               placeholder="0"
             />
-          </div>
-
-          <div>
-            <label htmlFor="key_objectives" className="block text-sm font-medium text-slate-700 mb-2">
-              Key Objectives
-            </label>
-            <input
-              type="text"
-              id="key_objectives"
-              name="key_objectives"
-              value={formData.key_objectives}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-indigo-500"
-              placeholder="Objective 1, Objective 2, Objective 3"
-            />
-            <p className="text-sm text-slate-500 mt-1">Separate objectives with commas</p>
           </div>
 
           <div className="flex justify-end gap-3 pt-6 border-t border-slate-200">

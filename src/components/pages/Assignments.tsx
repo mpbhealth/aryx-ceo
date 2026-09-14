@@ -29,7 +29,7 @@ interface AssignmentWithDetails {
   id: string;
   title: string;
   description?: string | null;
-  status: 'todo' | 'in_progress' | 'done' | 'pending';
+  status: 'pending' | 'in_progress' | 'completed' | 'blocked';
   priority?: string;
   project_id?: string | null;
   due_date?: string | null;
@@ -62,7 +62,7 @@ export default function Assignments() {
     title: '',
     description: '',
     project_id: '',
-    status: 'todo',
+    status: 'pending',
     due_date: ''
   });
 
@@ -107,7 +107,7 @@ export default function Assignments() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <p className="text-red-600 mb-4">Error loading assignments: {error}</p>
-          <p className="text-slate-600 mb-4">Please make sure the assignments table exists in Supabase.</p>
+          <p className="text-slate-600 mb-4">Tasks could not be loaded for this organization.</p>
           <button
             onClick={() => refetch()}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors"
@@ -132,10 +132,11 @@ export default function Assignments() {
     return matchesSearch && matchesProject && matchesStatus && matchesAssignee;
   }), [assignments, searchTerm, selectedProject, selectedStatus, selectedAssignee]);
 
-  const statuses = ['All', 'todo', 'in_progress', 'done'];
+  const statuses = ['All', 'pending', 'in_progress', 'completed'];
 
   const getStatusIcon = (status: string) => {
     switch (status) {
+      case 'completed':
       case 'done':
         return <CheckCircle className="w-5 h-5 text-emerald-600" />;
       case 'in_progress':
@@ -147,6 +148,7 @@ export default function Assignments() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'completed':
       case 'done':
         return 'bg-emerald-100 text-emerald-800';
       case 'in_progress':
@@ -423,7 +425,7 @@ export default function Assignments() {
             <div>
               <p className="text-sm font-medium text-slate-600">Completed</p>
               <p className="text-2xl font-bold text-slate-900">
-                {assignments.filter(a => a.status === 'done').length}
+                {assignments.filter(a => a.status === 'completed').length}
               </p>
             </div>
           </div>
@@ -439,7 +441,7 @@ export default function Assignments() {
               <p className="text-2xl font-bold text-slate-900">
                 {assignments.filter(a => {
                   if (!a.due_date) return false;
-                  return new Date(a.due_date) < new Date() && a.status !== 'done';
+                  return new Date(a.due_date) < new Date() && a.status !== 'completed';
                 }).length}
               </p>
             </div>
@@ -641,6 +643,7 @@ export default function Assignments() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onCreate={handleCreateAssignment}
+        projects={projects.map((project) => ({ id: project.id, name: project.name }))}
       />
 
       {/* Edit Assignment Modal */}
@@ -731,9 +734,9 @@ export default function Assignments() {
                     aria-label="Select assignment status"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-indigo-500"
                   >
-                    <option value="todo">To Do</option>
+                    <option value="pending">To Do</option>
                     <option value="in_progress">In Progress</option>
-                    <option value="done">Done</option>
+                    <option value="completed">Done</option>
                   </select>
                 </div>
 

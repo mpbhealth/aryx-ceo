@@ -92,9 +92,25 @@ export function useAssignments() {
     due_date?: string;
     assignee_id?: string;
     project_id?: string;
+    employee_email?: string;
   }): Promise<MutationResult> => {
     try {
       if (!orgId) throw new Error('No active organization');
+      let ownerUserId = assignment.assignee_id || user?.id || null;
+      const email = assignment.employee_email?.trim();
+      if (email) {
+        const { data: person, error: personError } = await supabase
+          .from('employee_profiles')
+          .select('user_id')
+          .eq('org_id', orgId)
+          .ilike('email', email)
+          .maybeSingle();
+        if (personError) throw personError;
+        if (!person?.user_id) {
+          throw new Error('No staff profile with a login is linked to that email.');
+        }
+        ownerUserId = person.user_id;
+      }
       const { data: row, error: insertError } = await supabase
         .from('tasks')
         .insert({
@@ -103,7 +119,7 @@ export function useAssignments() {
           body: assignment.description || null,
           status: toTaskStatus(assignment.status || 'pending'),
           due_at: assignment.due_date || null,
-          owner_user_id: assignment.assignee_id || user?.id || null,
+          owner_user_id: ownerUserId,
           project_id: assignment.project_id || null,
         })
         .select('*')

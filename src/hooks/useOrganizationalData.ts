@@ -8,7 +8,6 @@ export interface Department {
   name: string;
   description?: string;
   code?: string;
-  strategic_purpose?: string;
   parent_department_id?: string;
   department_lead_id?: string;
   budget?: number;
@@ -16,10 +15,6 @@ export interface Department {
   headcount?: number;
   location?: string;
   contact_email?: string;
-  mission_statement?: string;
-  key_objectives?: string[];
-  tech_stack?: string[];
-  reporting_frequency?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -45,7 +40,6 @@ export interface EmployeeProfile {
   start_date?: string;
   hire_date?: string;
   skills?: string[];
-  certifications?: string[];
   status?: string;
   created_at: string;
   updated_at: string;

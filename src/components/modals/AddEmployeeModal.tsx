@@ -29,7 +29,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onSuccess, departmen
     location: '',
     start_date: '',
     skills: '',
-    certifications: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +39,9 @@ export default function AddEmployeeModal({ isOpen, onClose, onSuccess, departmen
     setError(null);
 
     try {
-      // Convert skills and certifications strings to arrays
+      if (!orgId) throw new Error('No active organization');
+
+      // Convert skills string to array
       const skillsArray = formData.skills
         .split(',')
         .map(skill => skill.trim())
@@ -82,7 +83,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onSuccess, departmen
         location: '',
         start_date: '',
         skills: '',
-        certifications: ''
       });
 
       onSuccess();
@@ -334,41 +334,22 @@ export default function AddEmployeeModal({ isOpen, onClose, onSuccess, departmen
               </div>
             </div>
 
-            {/* Skills and Certifications */}
             <div className="md:col-span-2">
-              <h3 className="text-lg font-medium text-slate-900 mb-4">Skills and Certifications</h3>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="skills" className="block text-sm font-medium text-slate-700 mb-1">
-                    Skills
-                  </label>
-                  <textarea
-                    id="skills"
-                    name="skills"
-                    rows={2}
-                    value={formData.skills}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-indigo-500"
-                    placeholder="Enter skills separated by commas (e.g., JavaScript, React, Project Management)"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Separate multiple skills with commas</p>
-                </div>
-
-                <div>
-                  <label htmlFor="certifications" className="block text-sm font-medium text-slate-700 mb-1">
-                    Certifications
-                  </label>
-                  <textarea
-                    id="certifications"
-                    name="certifications"
-                    rows={2}
-                    value={formData.certifications}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-indigo-500"
-                    placeholder="Enter certifications separated by commas (e.g., AWS Certified, PMP, CISSP)"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Separate multiple certifications with commas</p>
-                </div>
+              <h3 className="text-lg font-medium text-slate-900 mb-4">Skills</h3>
+              <div>
+                <label htmlFor="skills" className="block text-sm font-medium text-slate-700 mb-1">
+                  Skills
+                </label>
+                <textarea
+                  id="skills"
+                  name="skills"
+                  rows={2}
+                  value={formData.skills}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-indigo-500"
+                  placeholder="Enter skills separated by commas (e.g., JavaScript, React, Project Management)"
+                />
+                <p className="text-xs text-slate-500 mt-1">Separate multiple skills with commas</p>
               </div>
             </div>
           </div>

@@ -103,14 +103,16 @@ export default function OrganizerTasks({ maxTasks = 5 }: OrganizerTasksProps) {
       setSaving(true);
       setSaveError(null);
 
-      await addAssignment({
+      const result = await addAssignment({
         title: newTask.title,
         description: newTask.description || undefined,
         due_date: newTask.due_date || undefined,
         status: 'pending',
-        priority: 'medium',
         project_id: undefined,
       });
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create task');
+      }
 
       setNewTask({ title: '', description: '', due_date: '' });
       setShowAddTask(false);
@@ -124,9 +126,12 @@ export default function OrganizerTasks({ maxTasks = 5 }: OrganizerTasksProps) {
   const handleToggleStatus = async (task: typeof assignments[0]) => {
     try {
       const newStatus = task.status === 'completed' ? 'pending' : task.status === 'pending' ? 'in_progress' : 'completed';
-      await updateAssignment(task.id, { status: newStatus as 'pending' | 'in_progress' | 'completed' | 'blocked' });
+      const result = await updateAssignment(task.id, { status: newStatus as 'pending' | 'in_progress' | 'completed' | 'blocked' });
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update task');
+      }
     } catch (err) {
-      console.error('Failed to update task:', err);
+      setSaveError(err instanceof Error ? err.message : 'Failed to update task');
     }
   };
 

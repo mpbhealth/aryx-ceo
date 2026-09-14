@@ -26,13 +26,8 @@ export default function EditDepartmentModal({
     code: '',
     parent_department_id: '',
     department_lead_id: '',
-    strategic_purpose: '',
     location: '',
     contact_email: '',
-    mission_statement: '',
-    key_objectives: '',
-    tech_stack: '',
-    reporting_frequency: 'weekly',
     budget_allocated: '',
     headcount: '0',
     is_active: true
@@ -49,13 +44,8 @@ export default function EditDepartmentModal({
         code: department.code || '',
         parent_department_id: department.parent_department_id || '',
         department_lead_id: department.department_lead_id || '',
-        strategic_purpose: department.strategic_purpose || '',
         location: department.location || '',
         contact_email: department.contact_email || '',
-        mission_statement: department.mission_statement || '',
-        key_objectives: department.key_objectives?.join(', ') || '',
-        tech_stack: department.tech_stack?.join(', ') || '',
-        reporting_frequency: department.reporting_frequency || 'weekly',
         budget_allocated: department.budget_allocated?.toString() || '',
         headcount: department.headcount?.toString() || '0',
         is_active: department.is_active !== false
@@ -318,93 +308,6 @@ export default function EditDepartmentModal({
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="reporting_frequency" className="block text-sm font-medium text-slate-700 mb-1">
-                    Reporting Frequency
-                  </label>
-                  <select
-                    id="reporting_frequency"
-                    name="reporting_frequency"
-                    value={formData.reporting_frequency}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="bi-weekly">Bi-Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Strategic Info */}
-            <div className="md:col-span-2">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
-                <span className="w-1 h-5 bg-purple-500 rounded-full mr-2"></span>
-                Strategic Information
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="strategic_purpose" className="block text-sm font-medium text-slate-700 mb-1">
-                    Strategic Purpose
-                  </label>
-                  <textarea
-                    id="strategic_purpose"
-                    name="strategic_purpose"
-                    rows={2}
-                    value={formData.strategic_purpose}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="mission_statement" className="block text-sm font-medium text-slate-700 mb-1">
-                    Mission Statement
-                  </label>
-                  <textarea
-                    id="mission_statement"
-                    name="mission_statement"
-                    rows={2}
-                    value={formData.mission_statement}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="key_objectives" className="block text-sm font-medium text-slate-700 mb-1">
-                    Key Objectives
-                  </label>
-                  <textarea
-                    id="key_objectives"
-                    name="key_objectives"
-                    rows={2}
-                    value={formData.key_objectives}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                    placeholder="Objective 1, Objective 2, Objective 3"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Separate multiple objectives with commas</p>
-                </div>
-
-                <div>
-                  <label htmlFor="tech_stack" className="block text-sm font-medium text-slate-700 mb-1">
-                    Tech Stack
-                  </label>
-                  <textarea
-                    id="tech_stack"
-                    name="tech_stack"
-                    rows={2}
-                    value={formData.tech_stack}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                    placeholder="React, Node.js, PostgreSQL"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Separate multiple technologies with commas</p>
-                </div>
               </div>
             </div>
 

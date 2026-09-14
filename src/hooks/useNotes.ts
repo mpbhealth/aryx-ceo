@@ -135,7 +135,7 @@ export function useNotes(options: UseNotesOptions) {
       const fallbackResult = await supabase
         .from('notes')
         .select('*')
-        .or(`created_by.eq.${user.id},user_id.eq.${user.id}`)
+        .eq('org_id', orgId)
         .order('created_at', { ascending: false });
 
       if (fallbackResult.error) throw fallbackResult.error;
@@ -198,20 +198,6 @@ export function useNotes(options: UseNotesOptions) {
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'notes' },
-          () => {
-            fetchAllNotes();
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'note_shares' },
-          () => {
-            fetchAllNotes();
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'note_notifications' },
           () => {
             fetchAllNotes();
           }
@@ -331,127 +317,23 @@ export function useNotes(options: UseNotesOptions) {
   };
 
   const shareNoteWithRole = async (
-    noteId: string,
-    targetRole: 'ceo' | 'cto',
-    permissionLevel: 'view' | 'edit' = 'view',
-    shareMessage?: string
+    _noteId: string,
+    _targetRole: 'ceo' | 'cto',
+    _permissionLevel: 'view' | 'edit' = 'view',
+    _shareMessage?: string
   ) => {
-    // Demo mode: sharing is not supported
-    if (isInDemoMode) {
-      console.warn('[useNotes] Sharing is not available in demo mode');
-      throw new Error('Note sharing is not available in demo mode. Please sign in to share notes.');
-    }
-
-    const { data, error: rpcError } = await supabase.rpc('share_note_with_role', {
-      p_note_id: noteId,
-      p_target_role: targetRole,
-      p_permission_level: permissionLevel,
-      p_share_message: shareMessage || null
-    });
-
-    if (rpcError) {
-      console.error('[useNotes] Error sharing note:', rpcError);
-      throw new Error(rpcError.message || 'Failed to share note. The sharing function may not be available.');
-    }
-
-    if (!data?.success) {
-      throw new Error(data?.error || 'Failed to share note');
-    }
-
-    await fetchAllNotes();
-    return data;
+    throw new Error('Note sharing is not available.');
   };
 
-  const unshareNote = async (noteId: string, userId?: string) => {
-    if (!user) throw new Error('Not authenticated');
-
-    // Demo mode: unsharing is not supported
-    if (isInDemoMode) {
-      console.warn('[useNotes] Unsharing is not available in demo mode');
-      return;
-    }
-
-    let query = supabase
-      .from('note_shares')
-      .delete()
-      .eq('note_id', noteId)
-      .eq('shared_by_user_id', user.id);
-
-    if (userId) {
-      query = query.eq('shared_with_user_id', userId);
-    }
-
-    const { error: deleteError } = await query;
-    if (deleteError) throw deleteError;
-
-    const { count } = await supabase
-      .from('note_shares')
-      .select('*', { count: 'exact', head: true })
-      .eq('note_id', noteId);
-
-    if (count === 0) {
-      await supabase
-        .from('notes')
-        .update({ is_shared: false, is_collaborative: false })
-        .eq('id', noteId);
-    }
-
-    await fetchAllNotes();
+  const unshareNote = async (_noteId: string, _userId?: string) => {
+    throw new Error('Note sharing is not available.');
   };
 
-  const getNoteShares = async (noteId: string): Promise<NoteShare[]> => {
-    // Demo mode: no shares
-    if (isInDemoMode) {
-      return [];
-    }
+  const getNoteShares = async (_noteId: string): Promise<NoteShare[]> => [];
 
-    const { data, error: fetchError } = await supabase
-      .from('note_shares')
-      .select(`
-        *,
-        shared_by:auth.users!note_shares_shared_by_user_id_fkey(email),
-        shared_with:auth.users!note_shares_shared_with_user_id_fkey(email)
-      `)
-      .eq('note_id', noteId);
+  const markNotificationAsRead = async (_notificationId: string) => {};
 
-    if (fetchError) throw fetchError;
-    return data || [];
-  };
-
-  const markNotificationAsRead = async (notificationId: string) => {
-    // Demo mode: no notifications
-    if (isInDemoMode) {
-      return;
-    }
-
-    const { error: updateError } = await supabase
-      .from('note_notifications')
-      .update({ is_read: true })
-      .eq('id', notificationId);
-
-    if (updateError) throw updateError;
-
-    await fetchAllNotes();
-  };
-
-  const markAllNotificationsAsRead = async () => {
-    if (!user) throw new Error('Not authenticated');
-
-    // Demo mode: no notifications
-    if (isInDemoMode) {
-      return;
-    }
-
-    const { error: updateError } = await supabase
-      .from('note_notifications')
-      .update({ is_read: true })
-      .eq('recipient_user_id', user.id)
-      .eq('is_read', false);
-
-    if (updateError) throw updateError;
-
-    await fetchAllNotes();
-  };
+  const markAllNotificationsAsRead = async () => {};
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 

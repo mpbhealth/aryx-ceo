@@ -17,7 +17,7 @@ Untouched this pass: Inbox Graph mail end-to-end, CRM write-proxy live POST, pas
 
 ## RESUME HERE
 
-Pass 2 closed notes `org_id` writes, Staff vs missing performance tables, mock policy history, unused `fact_iq_cohorts`, org-scoped people/depts/policies, assignment names.
+Pass 3 closed vanishing department/employee fields, assignment completed counts, note-share calls to missing tables, assignment create project/email wiring.
 
 Still not ours: Auth Site URL dashboard click, MarketFlow team id, Outlook Graph store, isolation org.
 
