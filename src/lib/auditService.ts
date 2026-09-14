@@ -177,15 +177,15 @@ export async function logSecurityEvent(
   }
 
   try {
-    // Get current user if not provided
-    let actorId = options.actorId;
-    let actorEmail = options.actorEmail;
-    
-    if (!actorId) {
-      const { data: { user } } = await supabase.auth.getUser();
-      actorId = user?.id;
-      actorEmail = actorEmail || user?.email;
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+    const expiresAtMs = session?.expires_at ? session.expires_at * 1000 : 0;
+    if (!accessToken || (expiresAtMs > 0 && expiresAtMs <= Date.now())) {
+      return { success: false, error: 'no_session' };
     }
+
+    let actorId = options.actorId || session.user?.id;
+    let actorEmail = options.actorEmail || session.user?.email;
 
     // Determine severity based on event type if not provided
     const severity = options.severity || getSeverityForEventType(eventType);

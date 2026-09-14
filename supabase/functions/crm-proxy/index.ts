@@ -2,9 +2,12 @@ import { corsHeadersFor } from '../_shared/cors.ts';
 import { requireUser, serviceClient } from '../_shared/auth.ts';
 import { loadOrgLink, resolveActiveOrg } from '../_shared/org.ts';
 
-const CRM_APP_HREF = Deno.env.get('ARYX_CRM_APP_URL') ?? 'https://crm.aryx.com';
+const CRM_APP_HREF = (Deno.env.get('ARYX_CRM_APP_URL') ?? 'https://crm.aryx.pro')
+  .replace(/\/$/, '')
+  .replace('https://crm.aryx.com', 'https://crm.aryx.pro');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CRM_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
 
 function crmHeaders() {
   const key = Deno.env.get('ARYX_CRM_SERVICE_ROLE_KEY') ?? '';
@@ -27,8 +30,32 @@ function displayName(row: Record<string, unknown>): string {
   return 'Untitled';
 }
 
-function recordHref(kind: string, id: string): string {
-  return kind === 'contact' ? `${CRM_APP_HREF}/contacts/${id}` : `${CRM_APP_HREF}/leads/${id}`;
+function crmOrigin(slug?: string | null): string {
+  if (!slug || !CRM_SLUG_RE.test(slug)) return CRM_APP_HREF;
+  try {
+    const url = new URL(CRM_APP_HREF);
+    if (url.hostname === 'crm.aryx.pro' || url.hostname === 'crm.getaryx.com') {
+      url.hostname = `${slug.toLowerCase()}.${url.hostname}`;
+    }
+    return url.origin;
+  } catch {
+    return CRM_APP_HREF;
+  }
+}
+
+function recordHref(kind: string, id: string, slug?: string | null): string {
+  const path = kind === 'contact' ? `/contacts/${id}` : `/leads/${id}`;
+  return `${crmOrigin(slug)}${path}`;
+}
+
+async function crmOrgSlug(crmUrl: string, crmOrgId: string): Promise<string | null> {
+  const res = await crmGet(
+    `${crmUrl}/rest/v1/organizations?id=eq.${encodeURIComponent(crmOrgId)}&select=slug&limit=1`,
+  );
+  if (!res.ok) return null;
+  const rows = await res.json();
+  const slug = Array.isArray(rows) ? rows[0]?.slug : null;
+  return typeof slug === 'string' && CRM_SLUG_RE.test(slug) ? slug.toLowerCase() : null;
 }
 
 Deno.serve(async (req) => {
@@ -66,6 +93,7 @@ Deno.serve(async (req) => {
     }
     if (req.method !== 'POST') throw new Error('method_not_allowed');
     const body = await req.json();
+    const slug = await crmOrgSlug(crmUrl, crmOrgId);
 
     if (body.action === 'list') {
       const [leadsRes, contactsRes] = await Promise.all([
@@ -85,7 +113,7 @@ Deno.serve(async (req) => {
           email: row.email ?? null,
           status: row.pipeline_stage ?? null,
           updated_at: row.updated_at ?? null,
-          href: recordHref('lead', row.id),
+          href: recordHref('lead', row.id, slug),
         }))),
         ...((Array.isArray(contacts) ? contacts : []).map((row) => ({
           id: row.id,
@@ -94,7 +122,7 @@ Deno.serve(async (req) => {
           email: row.email ?? null,
           status: row.lifecycle_stage ?? null,
           updated_at: row.updated_at ?? null,
-          href: recordHref('contact', row.id),
+          href: recordHref('contact', row.id, slug),
         }))),
       ];
       return new Response(JSON.stringify({ records }), {
@@ -134,7 +162,7 @@ Deno.serve(async (req) => {
           email: row.email ?? null,
           status: row.pipeline_stage ?? row.lifecycle_stage ?? null,
           updated_at: row.updated_at ?? null,
-          href: recordHref(kind, row.id),
+          href: recordHref(kind, row.id, slug),
         },
       }), {
         headers: { ...cors, 'Content-Type': 'application/json' },
@@ -158,14 +186,14 @@ Deno.serve(async (req) => {
             kind: 'lead',
             name: displayName(row),
             email,
-            href: recordHref('lead', row.id),
+            href: recordHref('lead', row.id, slug),
           }))),
           ...((Array.isArray(contacts) ? contacts : []).map((row) => ({
             id: row.id,
             kind: 'contact',
             name: displayName(row),
             email,
-            href: recordHref('contact', row.id),
+            href: recordHref('contact', row.id, slug),
           }))),
         ];
         candidates.push({ email, matches, ambiguous: matches.length !== 1 });

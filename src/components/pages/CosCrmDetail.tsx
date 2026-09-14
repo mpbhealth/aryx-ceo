@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { ARYX_CRM_HREF } from '@/lib/cos';
+import { crmRecordHref } from '@/lib/cos';
 import { useOrg } from '@/contexts/OrgContext';
 import { Unlinked } from './CosFinance';
 import { CosBezel, CosIslandLink, CosPage } from '../cos/CosPage';
@@ -57,7 +57,7 @@ export function CosCrmDetail() {
           <p className="mt-2 text-aryx-muted">{data.email || 'No email on file'}</p>
           <p className="mt-6 text-sm text-aryx-faint">Status · {data.status || '—'}</p>
           <div className="mt-8">
-            <CosIslandLink href={data.href || `${ARYX_CRM_HREF}/${data.kind}/${data.id}`}>
+            <CosIslandLink href={data.href || crmRecordHref(data.kind, data.id)}>
               Open in ARYX CRM
             </CosIslandLink>
           </div>

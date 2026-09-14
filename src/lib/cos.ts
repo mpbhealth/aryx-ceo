@@ -1,7 +1,17 @@
 export const MPB_COS_ORG_ID = 'a0000000-0000-0000-0000-000000000001';
-export const ARYX_CRM_HREF = 'https://crm.aryx.com';
+export const ARYX_CRM_HREF = 'https://crm.aryx.pro';
 export const ADVISORIQ_HREF = 'https://advisoriq.aryx.pro';
 export const ITSTS_HREF = 'https://support.aryx.pro';
+
+const CRM_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+
+export function crmRecordHref(kind: string, id: string, slug?: string | null): string {
+  const path = kind === 'contact' ? `/contacts/${id}` : `/leads/${id}`;
+  if (slug && CRM_SLUG_RE.test(slug)) {
+    return `https://${slug.toLowerCase()}.crm.aryx.pro${path}`;
+  }
+  return `${ARYX_CRM_HREF}${path}`;
+}
 
 export type CosMembershipRole = 'owner' | 'admin' | 'viewer' | 'cos';
 

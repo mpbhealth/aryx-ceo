@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { crmRecordHref } from '@/lib/cos';
 import { useOrg } from '@/contexts/OrgContext';
 import { OrgPicker } from '../cos/OrgPicker';
 import { Unlinked } from './CosFinance';
@@ -13,6 +13,7 @@ interface CrmRecord {
   email: string | null;
   status: string | null;
   updated_at: string | null;
+  href?: string;
 }
 
 export function CosCrmList() {
@@ -57,9 +58,11 @@ export function CosCrmList() {
       )}
       <div className="space-y-3">
         {(data || []).map((row) => (
-          <Link
+          <a
             key={`${row.kind}-${row.id}`}
-            to={`/crm/${row.kind}/${row.id}`}
+            href={row.href || crmRecordHref(row.kind, row.id)}
+            target="_blank"
+            rel="noreferrer"
             className="block rounded-[1.5rem] bg-aryx-ink/5 p-1.5 ring-1 ring-aryx-line"
           >
             <div className="rounded-[calc(1.5rem-0.375rem)] bg-aryx-elevated px-5 py-4">
@@ -73,7 +76,7 @@ export function CosCrmList() {
                 </span>
               </div>
             </div>
-          </Link>
+          </a>
         ))}
       </div>
     </CosPage>
