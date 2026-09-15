@@ -6,7 +6,7 @@ Environment read: COS Supabase `kylemtjsypmrtmuhmang` (production) · Vercel `ar
 Discovery: read-only SQL, function list, Vercel deployments. Repair: local code + edge-function deploy. No production SQL writes.
 
 Scope in: mounted COS desk (Command, Finance, CRM, Enrollments, Advisors, Pipeline, Tickets, Marketing, Inbox, Organizer, Company/Build, Settings), warehouse extractors, deployed edge functions, org links, cron.  
-Scope out: inventing a MarketFlow team id, remounting AI chat, creating `outlook_config`, rotating the mail cron secret, Auth Site URL dashboard click (blocked remotely).
+Scope out: inventing a MarketFlow team id, remounting AI chat, creating `outlook_config`, rotating the mail cron secret.
 
 ## Coverage
 
@@ -19,7 +19,7 @@ Untouched this pass: Inbox Graph mail end-to-end, CRM write-proxy live POST, pas
 
 Pass 3 closed vanishing department/employee fields, assignment completed counts, note-share calls to missing tables, assignment create project/email wiring.
 
-Still not ours: Auth Site URL dashboard click, MarketFlow team id, Outlook Graph store, isolation org.
+Auth Site URL is live: `https://ceo.aryx.pro` plus `https://ceo.aryx.pro/**`. Still not ours: MarketFlow team id, Outlook Graph store, isolation org.
 
 ## Drift Register
 
@@ -31,7 +31,7 @@ Still not ours: Auth Site URL dashboard click, MarketFlow team id, Outlook Graph
 | `agent-chat` | present, UI unmounted | **absent** | repo-only, intentionally unmounted | do not remount |
 | Leftover unused functions (compliance-*, monday-api, …) | deleted this pass | never deployed | cleared | none live |
 | `outlook_config` | hook/function expect it | **table does not exist** | stamped-not-applied / never created | calendar cannot connect |
-| Auth Site URL | repo lists `ceo.aryx.pro` | dashboard PATCH blocked earlier | **unverified live** | login redirects may still miss the host |
+| Auth Site URL | repo lists `ceo.aryx.pro` | live `https://ceo.aryx.pro` plus `/**` | **live** | email and OAuth redirects use the CEO host |
 | `cos_org_link.marketflow_team_id` | extractor ready | **null** on both orgs | data gap | Marketing stays `—` |
 | Isolation org `b000…0002` | unlinked | confirmed unlinked | intended | keep empty |
 
@@ -68,7 +68,7 @@ Live functions at audit start: `connector-sync` v22, `crm-proxy` v17, `email-oau
 | D-PUB-1 | P2 | Public upload | Unauth route to undeployed function | `main.tsx` | CONFIRMED | routes removed |
 | D-FACT-1 | P2 | Command/Finance | `$0` when linked but empty | `\|\| 0` | CONFIRMED | `formatFact` |
 | D-MKT-1 | — | Marketing | No sessions | `fact_traffic_daily` 0; `marketflow_team_id` null | CONFIRMED | leave unlinked |
-| D-AUTH-1 | P2 | Auth | Site URL may still omit `ceo.aryx.pro` | dashboard PATCH failed earlier | UNVERIFIED live | add in dashboard |
+| D-AUTH-1 | P2 | Auth | Site URL omitted `ceo.aryx.pro` | was `cos.aryxtech.com` | CLOSED 2026-09-14 | config push |
 | D-CRON-1 | P3 | Ops | Mail cron command embeds secret | `cron.job` | CONFIRMED | rotate; do not print |
 | D-SYNC-1 | P3 | AdvisorIQ | three `sync_runs` stuck `running` | prior warehouse read | INFERRED this resume | inspect later |
 | D-COH-1 | P3 | Enrollments | `fact_iq_cohorts` unused | table filled, no UI | CONFIRMED | backlog |
@@ -96,7 +96,7 @@ Live functions at audit start: `connector-sync` v22, `crm-proxy` v17, `email-oau
 
 Conditions (not code):
 
-1. Add `https://ceo.aryx.pro` and `https://ceo.aryx.pro/**` in COS Auth URL config.
+1. Auth URLs are set: Site URL `https://ceo.aryx.pro`, allow list includes `https://ceo.aryx.pro` and `https://ceo.aryx.pro/**`.
 2. Marketing stays empty until a real MarketFlow team id is mapped.
 3. Outlook stays empty until Graph is provisioned server-side. Do not create `outlook_config` from the browser.
 4. Isolation org stays unlinked.
