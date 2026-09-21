@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { money, periodBounds, type PeriodGrain, type PeriodKey } from '@/lib/cos';
+import { grainForPeriod, money, periodBounds, type PeriodGrain } from '@/lib/cos';
 import { formatFact } from '@/lib/marketingFacts';
 import { downloadCsv } from '@/lib/exportFacts';
 import { useOrg } from '@/contexts/OrgContext';
+import { useDeskPeriod } from '@/contexts/DeskPeriodContext';
 import { OrgPicker } from '../cos/OrgPicker';
 import { PeriodToggle } from '../cos/PeriodToggle';
 import { CommandStat, CommandStrip } from '../cos/CommandStrip';
@@ -32,10 +33,10 @@ const GRAINS: PeriodGrain[] = ['month', 'quarter', 'year'];
 
 export function CosFinance() {
   const { orgId, linked, rollup, memberships, isOperator } = useOrg();
-  const [period, setPeriod] = useState<PeriodKey>('mtd');
-  const [grain, setGrain] = useState<PeriodGrain>('month');
+  const { period, customStart, customEnd, setPeriod, setCustomRange, pnlGrain, setPnlGrain } = useDeskPeriod();
+  const grain = pnlGrain ?? grainForPeriod(period);
   const orgIds = rollup ? memberships.map((row) => row.org_id) : orgId ? [orgId] : [];
-  const bounds = periodBounds(period);
+  const bounds = periodBounds(period, customStart, customEnd);
 
   const rows = useQuery({
     queryKey: ['finance-pnl', orgIds.join(','), bounds.start, grain],
@@ -90,13 +91,19 @@ export function CosFinance() {
           <>
             <OrgPicker />
             <div className="flex flex-wrap items-center gap-3">
-              <PeriodToggle value={period} onChange={setPeriod} />
+              <PeriodToggle
+                value={period}
+                onChange={setPeriod}
+                customStart={customStart}
+                customEnd={customEnd}
+                onCustom={setCustomRange}
+              />
               <div className="flex gap-2">
                 {GRAINS.map((id) => (
                   <button
                     key={id}
                     type="button"
-                    onClick={() => setGrain(id)}
+                    onClick={() => setPnlGrain(id)}
                     className={`rounded-full px-3 py-2.5 text-[10px] uppercase tracking-[0.16em] ${
                       grain === id ? 'bg-aryx-accent text-white' : 'bg-aryx-ink/[0.04] text-aryx-muted ring-1 ring-aryx-line'
                     }`}

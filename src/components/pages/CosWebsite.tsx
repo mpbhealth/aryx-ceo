@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { compactNumber, periodBounds, type PeriodKey } from '@/lib/cos';
+import { compactNumber, periodBounds } from '@/lib/cos';
 import { conversionRate, formatFact, sourceLabel } from '@/lib/marketingFacts';
 import { downloadCsv } from '@/lib/exportFacts';
 import { useTrafficFacts } from '@/hooks/useTrafficFacts';
 import { useOrg } from '@/contexts/OrgContext';
+import { useDeskPeriod } from '@/contexts/DeskPeriodContext';
 import { CosBezel, CosIslandButton, CosPage, CosPageHero, CosTable } from '../cos/CosPage';
 import { OrgPicker } from '../cos/OrgPicker';
 import { PeriodToggle } from '../cos/PeriodToggle';
@@ -13,9 +14,7 @@ import { TrendSpark } from '../cos/TrendSpark';
 
 export function CosWebsite() {
   const { orgId, linked, rollup, memberships, isOperator } = useOrg();
-  const [period, setPeriod] = useState<PeriodKey>('mtd');
-  const [customStart, setCustomStart] = useState('');
-  const [customEnd, setCustomEnd] = useState('');
+  const { period, customStart, customEnd, setPeriod, setCustomRange } = useDeskPeriod();
   const bounds = periodBounds(period, customStart, customEnd);
   const orgIds = rollup ? memberships.map((row) => row.org_id) : orgId ? [orgId] : [];
 
@@ -110,10 +109,7 @@ export function CosWebsite() {
               onChange={setPeriod}
               customStart={customStart}
               customEnd={customEnd}
-              onCustom={(start, end) => {
-                setCustomStart(start);
-                setCustomEnd(end);
-              }}
+              onCustom={setCustomRange}
             />
           </>
         }

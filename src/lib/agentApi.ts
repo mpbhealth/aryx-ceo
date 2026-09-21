@@ -26,11 +26,27 @@ export interface ToolResult {
   success: boolean;
 }
 
+export interface AgentTurnContext {
+  orgId: string | null;
+  orgIds: string[];
+  pathname: string;
+  period: string;
+  pnlGrain?: 'month' | 'quarter' | 'year' | null;
+  linked: {
+    enrollment: boolean;
+    crm: boolean;
+    advisoriq: boolean;
+    tickets: boolean;
+    traffic: boolean;
+  };
+}
+
 export interface ChatResponse {
   message: ChatMessage;
   tool_calls?: ToolCall[];
   tool_results?: ToolResult[];
-  finish_reason: 'stop' | 'tool_calls' | 'length' | 'content_filter';
+  finish_reason?: 'stop' | 'tool_calls' | 'length' | 'content_filter';
+  needs_key?: boolean;
 }
 
 export interface AgentApiError {
@@ -62,7 +78,8 @@ const getAgentApiUrl = (): string => {
  */
 export async function sendAgentMessage(
   messages: ChatMessage[],
-  accessToken: string
+  accessToken: string,
+  context?: AgentTurnContext,
 ): Promise<ChatResponse> {
   const apiUrl = getAgentApiUrl();
 
@@ -75,7 +92,7 @@ export async function sendAgentMessage(
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, ...context }),
   });
 
   if (!response.ok) {

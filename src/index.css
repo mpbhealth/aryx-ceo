@@ -1281,7 +1281,17 @@
   .cos-rise-1,
   .cos-rise-2,
   .cos-rise-3,
-  .cos-rise-4 {
+  .cos-rise-4,
+  .orbit-ring {
     animation: none !important;
   }
+}
+
+@keyframes orbit-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.orbit-ring {
+  animation: orbit-rotate 20s linear infinite;
 }

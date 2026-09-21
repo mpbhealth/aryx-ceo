@@ -6,8 +6,16 @@ import {
   ChatResponse,
   ToolCall,
   ToolResult,
-  AgentApiClientError
+  AgentApiClientError,
+  AgentTurnContext,
 } from '../lib/agentApi';
+import type { OrbitWriteAction } from '../lib/orbit/intent';
+
+export interface ChatConfirm {
+  action: OrbitWriteAction;
+  title: string;
+  summary: string;
+}
 
 export interface ChatEntry {
   id: string;
@@ -17,6 +25,9 @@ export interface ChatEntry {
   toolCalls?: ToolCall[];
   toolResults?: ToolResult[];
   isError?: boolean;
+  href?: string;
+  label?: string;
+  confirm?: ChatConfirm;
 }
 
 export interface UseAgentChatOptions {
@@ -29,12 +40,13 @@ export interface UseAgentChatReturn {
   messages: ChatEntry[];
   isLoading: boolean;
   error: Error | null;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, context?: AgentTurnContext) => Promise<ChatResponse | null>;
+  pushEntries: (entries: ChatEntry[]) => void;
   clearHistory: () => void;
   setSystemPrompt: (prompt: string) => void;
 }
 
-function generateId(): string {
+export function createChatId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
 
@@ -43,39 +55,52 @@ export function useAgentChat(options: UseAgentChatOptions = {}): UseAgentChatRet
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const systemPromptRef = useRef<string>(options.systemPrompt || '');
+  const messagesRef = useRef<ChatEntry[]>([]);
+  messagesRef.current = messages;
+  const onToolCall = options.onToolCall;
+  const onError = options.onError;
 
   const setSystemPrompt = useCallback((prompt: string) => {
     systemPromptRef.current = prompt;
   }, []);
 
-  const sendMessage = useCallback(async (content: string) => {
-    if (!content.trim()) return;
+  const pushEntries = useCallback((entries: ChatEntry[]) => {
+    setMessages((prev) => {
+      const next = [...prev, ...entries];
+      messagesRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const sendMessage = useCallback(async (content: string, context?: AgentTurnContext) => {
+    if (!content.trim()) return null;
 
     setIsLoading(true);
     setError(null);
 
-    // Add user message to the UI immediately
     const userEntry: ChatEntry = {
-      id: generateId(),
+      id: createChatId(),
       role: 'user',
       content: content.trim(),
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userEntry]);
+    const history = messagesRef.current;
+    setMessages((prev) => {
+      const next = [...prev, userEntry];
+      messagesRef.current = next;
+      return next;
+    });
 
     try {
-      // Get auth token from Supabase
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.access_token) {
         throw new Error('Not authenticated. Please sign in to use the AI assistant.');
       }
 
-      // Build messages array for the API
       const apiMessages: ChatMessage[] = [];
 
-      // Add system prompt if available
       if (systemPromptRef.current) {
         apiMessages.push({
           role: 'system',
@@ -83,8 +108,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}): UseAgentChatRet
         });
       }
 
-      // Add conversation history (excluding system messages)
-      messages.forEach(msg => {
+      history.forEach((msg) => {
         if (msg.role !== 'system') {
           apiMessages.push({
             role: msg.role,
@@ -94,28 +118,25 @@ export function useAgentChat(options: UseAgentChatOptions = {}): UseAgentChatRet
         }
       });
 
-      // Add the new user message
       apiMessages.push({
         role: 'user',
         content: content.trim(),
       });
 
-      // Send to API
       const response: ChatResponse = await sendAgentMessage(
         apiMessages,
-        session.access_token
+        session.access_token,
+        context,
       );
 
-      // Handle tool calls if present
       if (response.tool_calls && response.tool_calls.length > 0) {
-        response.tool_calls.forEach(toolCall => {
-          options.onToolCall?.(toolCall);
+        response.tool_calls.forEach((toolCall) => {
+          onToolCall?.(toolCall);
         });
       }
 
-      // Add assistant response
       const assistantEntry: ChatEntry = {
-        id: generateId(),
+        id: createChatId(),
         role: 'assistant',
         content: response.message.content,
         timestamp: new Date(),
@@ -123,32 +144,40 @@ export function useAgentChat(options: UseAgentChatOptions = {}): UseAgentChatRet
         toolResults: response.tool_results,
       };
 
-      setMessages(prev => [...prev, assistantEntry]);
-
+      setMessages((prev) => {
+        const next = [...prev, assistantEntry];
+        messagesRef.current = next;
+        return next;
+      });
+      return response;
     } catch (err) {
-      const error = err instanceof Error ? err : new Error('Unknown error occurred');
-      setError(error);
-      options.onError?.(error);
+      const nextError = err instanceof Error ? err : new Error('Unknown error occurred');
+      setError(nextError);
+      onError?.(nextError);
 
-      // Add error message to chat
       const errorEntry: ChatEntry = {
-        id: generateId(),
+        id: createChatId(),
         role: 'assistant',
-        content: error instanceof AgentApiClientError
-          ? `Error: ${error.message}${error.status === 401 ? ' Please sign in again.' : ''}`
-          : `Error: ${error.message}`,
+        content: nextError instanceof AgentApiClientError
+          ? `Error: ${nextError.message}${nextError.status === 401 ? ' Please sign in again.' : ''}`
+          : `Error: ${nextError.message}`,
         timestamp: new Date(),
         isError: true,
       };
 
-      setMessages(prev => [...prev, errorEntry]);
-
+      setMessages((prev) => {
+        const next = [...prev, errorEntry];
+        messagesRef.current = next;
+        return next;
+      });
+      return null;
     } finally {
       setIsLoading(false);
     }
-  }, [messages, options]);
+  }, [onError, onToolCall]);
 
   const clearHistory = useCallback(() => {
+    messagesRef.current = [];
     setMessages([]);
     setError(null);
   }, []);
@@ -158,6 +187,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}): UseAgentChatRet
     isLoading,
     error,
     sendMessage,
+    pushEntries,
     clearHistory,
     setSystemPrompt,
   };

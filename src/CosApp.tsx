@@ -12,6 +12,9 @@ import { InstallAppBanner } from './components/ui/InstallAppBanner';
 import { remapLegacyPath } from './lib/cos';
 import { ThemeToggle } from './components/brand/ThemeToggle';
 import { OrgProvider, useOrg } from './contexts/OrgContext';
+import { DeskPeriodProvider } from './contexts/DeskPeriodContext';
+import { AIAssistantProvider } from './providers/AIAssistantProvider';
+import { GlobalAIAssistant } from './components/ai/GlobalAIAssistant';
 
 const CosHome = lazy(() => import('./components/pages/CosHome'));
 const CosInbox = lazy(() => import('./components/pages/CosInbox'));
@@ -220,14 +223,19 @@ function CosContent() {
 
 export default function CosApp() {
   return (
-    <AppShell>
-      <OrgProvider>
-        <CosContent />
-      </OrgProvider>
-      <KeyboardShortcutsModal />
-      <SessionTimeoutWarning />
-      <UpdateBanner />
-      <InstallAppBanner />
-    </AppShell>
+    <AIAssistantProvider>
+      <AppShell>
+        <OrgProvider>
+          <DeskPeriodProvider>
+            <CosContent />
+            <GlobalAIAssistant />
+          </DeskPeriodProvider>
+        </OrgProvider>
+        <KeyboardShortcutsModal />
+        <SessionTimeoutWarning />
+        <UpdateBanner />
+        <InstallAppBanner />
+      </AppShell>
+    </AIAssistantProvider>
   );
 }

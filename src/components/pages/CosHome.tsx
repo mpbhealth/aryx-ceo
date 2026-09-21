@@ -1,13 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { syncConnectors } from '@/lib/connectors';
-import { money, compactNumber, periodBounds, grainForPeriod, type PeriodKey, ADVISORIQ_HREF } from '@/lib/cos';
+import { money, compactNumber, periodBounds, grainForPeriod, ADVISORIQ_HREF } from '@/lib/cos';
 import { computeForecast, forecastSentence, preferCompleteMonth } from '@/lib/forecast';
 import { conversionRate, formatFact } from '@/lib/marketingFacts';
 import { useTrafficFacts } from '@/hooks/useTrafficFacts';
 import { useOrg } from '@/contexts/OrgContext';
+import { useDeskPeriod } from '@/contexts/DeskPeriodContext';
 import { CosBezel, CosIslandButton, CosPage, CosPageHero, CosTable } from '../cos/CosPage';
 import { AryxLogo } from '../brand/AryxLogo';
 import { OrgPicker } from '../cos/OrgPicker';
@@ -75,9 +76,7 @@ function shown(linked: boolean, value: number | null | undefined, format: (n: nu
 export function CosHome() {
   const queryClient = useQueryClient();
   const { orgId, linked, rollup, memberships, isOperator } = useOrg();
-  const [period, setPeriod] = useState<PeriodKey>('mtd');
-  const [customStart, setCustomStart] = useState('');
-  const [customEnd, setCustomEnd] = useState('');
+  const { period, customStart, customEnd, setPeriod, setCustomRange } = useDeskPeriod();
   const bounds = periodBounds(period, customStart, customEnd);
   const grain = grainForPeriod(period);
   const orgIds = rollup ? memberships.map((row) => row.org_id) : orgId ? [orgId] : [];
@@ -323,10 +322,7 @@ export function CosHome() {
               onChange={setPeriod}
               customStart={customStart}
               customEnd={customEnd}
-              onCustom={(start, end) => {
-                setCustomStart(start);
-                setCustomEnd(end);
-              }}
+              onCustom={setCustomRange}
             />
           </>
         }

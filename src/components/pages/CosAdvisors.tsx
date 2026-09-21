@@ -61,6 +61,21 @@ export function CosAdvisors() {
     },
   });
 
+  const billing = useQuery({
+    queryKey: ['book-billing-risk', orgIds.join(',')],
+    enabled: orgIds.length > 0 && linked.advisoriq,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('book_billing_risk')
+        .select('display_name, member_key, product_key, monthly_fee, risk_flag, status')
+        .in('org_id', orgIds)
+        .order('next_billing_date', { ascending: true, nullsFirst: false })
+        .limit(20);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const list = (rows.data || []).filter((row) => {
@@ -130,6 +145,22 @@ export function CosAdvisors() {
           </div>
         </div>
       )}
+      <div className="mt-8">
+        <h2 className="mb-3 text-sm uppercase tracking-[0.16em] text-aryx-faint">Billing risk</h2>
+        {(billing.data || []).length === 0 && (
+          <p className="text-sm text-aryx-muted">No billing-risk rows yet.</p>
+        )}
+        <ul className="space-y-2 text-sm">
+          {(billing.data || []).slice(0, 12).map((row) => (
+            <li key={`${row.member_key}-${row.product_key}`} className="flex justify-between gap-4">
+              <span>{row.display_name || row.member_key}</span>
+              <span className="text-aryx-faint">
+                {row.monthly_fee == null ? '—' : money(Number(row.monthly_fee))} · {row.risk_flag || row.status || 'risk'}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
       <div className="mt-8 flex flex-col gap-3 md:flex-row md:items-center">
         <input
           value={query}

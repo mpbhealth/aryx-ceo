@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { compactNumber, money, periodBounds, type PeriodKey } from '@/lib/cos';
+import { compactNumber, money, periodBounds } from '@/lib/cos';
 import { formatFact } from '@/lib/marketingFacts';
 import { computeForecast, preferCompleteMonth } from '@/lib/forecast';
 import { useOrg } from '@/contexts/OrgContext';
+import { useDeskPeriod } from '@/contexts/DeskPeriodContext';
 import { OrgPicker } from '../cos/OrgPicker';
 import { PeriodToggle } from '../cos/PeriodToggle';
 import { CommandStat, CommandStrip } from '../cos/CommandStrip';
@@ -16,7 +17,7 @@ import { rollupTideMonths } from '@/lib/movementTide';
 
 export function CosEnrollments() {
   const { orgId, linked, rollup, memberships } = useOrg();
-  const [period, setPeriod] = useState<PeriodKey>('mtd');
+  const { period, setPeriod } = useDeskPeriod();
   const bounds = periodBounds(period);
   const orgIds = rollup ? memberships.map((row) => row.org_id) : orgId ? [orgId] : [];
 

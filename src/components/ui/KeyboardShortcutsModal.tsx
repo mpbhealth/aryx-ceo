@@ -11,7 +11,7 @@ const shortcuts: { category: string; items: Shortcut[] }[] = [
     category: 'Navigation',
     items: [
       { keys: ['Ctrl', 'K'], description: 'Open Command Palette' },
-      { keys: ['Ctrl', 'Shift', 'A'], description: 'Toggle AI Assistant' },
+      { keys: ['Ctrl', 'Shift', 'A'], description: 'Toggle Orbit' },
       { keys: ['?'], description: 'Show keyboard shortcuts' },
       { keys: ['Esc'], description: 'Close modals / panels' },
     ],

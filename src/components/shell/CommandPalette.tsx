@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useApps } from '@/hooks/useApps';
 import { useShell } from './AppShell';
+import { useAIAssistant } from '@/providers/AIAssistantProvider';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -60,6 +61,7 @@ const iconMap: Record<string, React.ElementType> = {
 export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const navigate = useNavigate();
   const { openMap } = useShell();
+  const { openAssistant } = useAIAssistant();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const { apps, isLoading } = useApps();
@@ -77,6 +79,18 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     }));
 
     const staticActions: CommandItem[] = [
+      {
+        id: 'action-ask-orbit',
+        type: 'action',
+        title: 'Ask Orbit…',
+        description: 'Read live desk facts',
+        icon: Orbit,
+        keywords: ['orbit', 'assistant', 'ai', 'ask'],
+        action: () => {
+          onClose();
+          openAssistant();
+        },
+      },
       {
         id: 'action-galaxy-map',
         type: 'action',
@@ -107,7 +121,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     ];
 
     return [...appCommands, ...staticActions];
-  }, [apps, onClose, openMap]);
+  }, [apps, onClose, openAssistant, openMap]);
 
   // Filter commands based on search query
   const filteredCommands = useMemo(() => {

@@ -10,15 +10,17 @@ interface ToolCallVisualizationProps {
 
 // Map tool names to user-friendly labels
 const toolLabels: Record<string, string> = {
-  create_ticket: 'Create Support Ticket',
-  assign_ticket: 'Assign Ticket',
-  update_ticket_status: 'Update Ticket Status',
-  search_kb: 'Search Knowledge Base',
-  get_member_info: 'Get Member Info',
-  list_tickets: 'List Tickets',
-  add_ticket_note: 'Add Ticket Note',
-  escalate_ticket: 'Escalate Ticket',
-  get_ticket_history: 'Get Ticket History',
+  list_pnl: 'P&L',
+  list_enrollments: 'Enrollments',
+  advisor_books: 'Advisor books',
+  forward_risk: 'Forward risk',
+  pipeline_facts: 'Pipeline',
+  ticket_health: 'Ticket health',
+  traffic_facts: 'Traffic',
+  source_health: 'Source health',
+  forecast_summary: 'Forecast',
+  explain_page: 'This page',
+  navigate: 'Navigate',
 };
 
 function getToolLabel(name: string): string {
