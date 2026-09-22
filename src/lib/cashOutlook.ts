@@ -1,4 +1,4 @@
-import { preferCompleteMonth } from './forecast';
+import { preferCompleteMonth } from './forecast.ts';
 
 export interface CashPaceInput {
   collected: number;
