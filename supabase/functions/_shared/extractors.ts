@@ -23,6 +23,15 @@ import {
   type PnlParts,
 } from './moneyMatch.ts';
 import { countFiltered, countUnscoped, restGet, restGetOrgOrNull, restGetPages, restGetUnscopedPages, restRpc, type OrgFilter } from './remote.ts';
+import {
+  enrollmentStatusCounts,
+  firstPayRateByKey,
+  qualityFromGroups,
+  rollupDirectUplines,
+  type LifeRow,
+  type QualityFact,
+} from '../../../src/lib/bookQuality.ts';
+import { mrrLeavingWithin90 } from '../../../src/lib/cashOutlook.ts';
 
 const OPEN_TICKETS = 'in.(new,open,awaiting_customer,on_hold)';
 const RESOLVED_TICKETS = 'in.(resolved,closed)';
@@ -336,6 +345,61 @@ export async function extractEnrollment(
     }, { onConflict: 'org_id,period_start,product_key' });
   }
 
+  const groups = new Map<string, LifeRow[]>();
+  const enrollmentKey = new Map<string, string>();
+  const mrrByProduct = new Map<string, number>();
+  for (const row of enrollments) {
+    const key = String(row.product_id || 'unmapped');
+    const list = groups.get(key) || [];
+    list.push({
+      enrolledOn: row.enrollment_date ? String(row.enrollment_date) : null,
+      inactiveOn: row.inactive_date ? String(row.inactive_date) : null,
+      status: row.status ? String(row.status) : null,
+    });
+    groups.set(key, list);
+    if (row.id) enrollmentKey.set(String(row.id), key);
+    if (['Active', 'Future Active'].includes(String(row.status))) {
+      mrrByProduct.set(key, (mrrByProduct.get(key) || 0) + Number(row.monthly_cost || 0));
+    }
+  }
+  const payRows = await restPagesOrNull(creds.url, creds.key, 'billing?select=enrollment_id,status', filter);
+  const commissionRows = await restPagesOrNull(
+    creds.url,
+    creds.key,
+    `commissions?select=amount,status,product_id,commission_month&commission_month=gte.${yearFrom.slice(0, 7)}`,
+    filter,
+  );
+  const commissionsByProduct = commissionRows ? latestPaidByProduct(commissionRows) : null;
+  const economics = new Map<string, { mrr: number; vendor: number; commissions: number | null }>();
+  for (const key of new Set([...groups.keys(), ...mrrByProduct.keys(), ...vendorMonthly.keys()])) {
+    economics.set(key, {
+      mrr: mrrByProduct.get(key) || 0,
+      vendor: vendorMonthly.get(key)?.cost || 0,
+      commissions: commissionsByProduct ? (commissionsByProduct.get(key) || 0) : null,
+    });
+  }
+  const firstPay = payRows
+    ? firstPayRateByKey(payRows.map((row) => ({
+      enrollmentId: String(row.enrollment_id || ''),
+      status: String(row.status || ''),
+    })), enrollmentKey)
+    : null;
+  await replaceBookQuality(admin, orgId, 'product', qualityFromGroups(groups, today, economics, firstPay).map((fact) => ({
+    ...fact,
+    label: productLabel.get(fact.qualityKey) || null,
+  })));
+  const statusCounts = enrollmentStatusCounts(enrollments.map((row) => String(row.status || '')));
+  const { error: opsError } = await admin.from('fact_enrollment_ops').upsert({
+    org_id: orgId,
+    fact_date: today,
+    active_count: statusCounts.active,
+    future_active_count: statusCounts.futureActive,
+    other_count: statusCounts.other,
+    metadata: {},
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'org_id,fact_date' });
+  if (opsError) throw opsError;
+
   const { gross, net } = pnlNet(current);
   const metrics = [
     { metric_key: 'enrollment_count', value: enrollments.length },
@@ -486,6 +550,74 @@ export async function extractCrm(
     await upsertSnapshot(admin, orgId, 'aryx_crm', metric.metric_key, metric.value, today);
   }
   return { source: 'aryx_crm', status: 'healthy', metrics };
+}
+
+async function restPagesOrNull(
+  url: string,
+  key: string,
+  path: string,
+  filter: OrgFilter,
+): Promise<Array<Record<string, unknown>> | null> {
+  try {
+    return await restGetPages(url, key, path, filter);
+  } catch {
+    return null;
+  }
+}
+
+function latestPaidByProduct(rows: Array<Record<string, unknown>>): Map<string, number> {
+  let latest = '';
+  for (const row of rows) {
+    const month = commissionMonthKey(row.commission_month);
+    if (month && month > latest) latest = month;
+  }
+  const map = new Map<string, number>();
+  if (!latest) return map;
+  for (const row of rows) {
+    if (commissionMonthKey(row.commission_month) !== latest) continue;
+    if (!isPaidCommissionStatus(row.status)) continue;
+    const product = String(row.product_id || 'unmapped');
+    map.set(product, (map.get(product) || 0) + Number(row.amount || 0));
+  }
+  return map;
+}
+
+async function replaceBookQuality(
+  admin: SupabaseClient,
+  orgId: string,
+  grain: 'product' | 'advisor',
+  facts: QualityFact[],
+) {
+  const rows = facts.map((fact) => ({
+    org_id: orgId,
+    grain,
+    quality_key: fact.qualityKey,
+    cohort_size: fact.cohortSize,
+    cohort_30: fact.cohort30,
+    cohort_60: fact.cohort60,
+    cohort_90: fact.cohort90,
+    survived_30: fact.survived30,
+    survived_60: fact.survived60,
+    survived_90: fact.survived90,
+    first_pay_success_pct: fact.firstPaySuccessPct,
+    contribution: fact.contribution,
+    metadata: {
+      commission_applied: fact.commissionApplied,
+      ...(fact.label ? { product_label: fact.label } : {}),
+    },
+    updated_at: new Date().toISOString(),
+  }));
+  if (rows.length > 0) {
+    const { error } = await admin.from('fact_book_quality').upsert(rows, { onConflict: 'org_id,grain,quality_key' });
+    if (error) throw error;
+  }
+  const keys = rows.map((row) => row.quality_key);
+  let query = admin.from('fact_book_quality').delete().eq('org_id', orgId).eq('grain', grain);
+  if (keys.length > 0) {
+    query = query.not('quality_key', 'in', `(${keys.map((key) => `"${key.replaceAll('"', '')}"`).join(',')})`);
+  }
+  const { error } = await query;
+  if (error) throw error;
 }
 
 async function restGetSafe(
@@ -749,6 +881,84 @@ export async function extractAdvisorIq(
     }, { onConflict: 'org_id,action_key' });
   }
 
+  const agentLives = await restPagesOrNull(
+    creds.url,
+    creds.key,
+    'member_products?select=agent_id,inactive_date,product_created_date,active_date,status',
+    filter,
+  );
+  let advisorQuality: QualityFact[] = [];
+  if (agentLives) {
+    const advisorGroups = new Map<string, LifeRow[]>();
+    for (const row of agentLives) {
+      const key = String(row.agent_id || '').trim();
+      if (!key) continue;
+      const list = advisorGroups.get(key) || [];
+      list.push({
+        enrolledOn: row.product_created_date ? String(row.product_created_date) : (row.active_date ? String(row.active_date) : null),
+        inactiveOn: row.inactive_date ? String(row.inactive_date) : null,
+        status: row.status ? String(row.status) : null,
+      });
+      advisorGroups.set(key, list);
+    }
+    advisorQuality = qualityFromGroups(advisorGroups, today, new Map(), null);
+    await replaceBookQuality(admin, orgId, 'advisor', advisorQuality);
+  }
+
+  const advisorNodes = await restPagesOrNull(
+    creds.url,
+    creds.key,
+    'advisors?select=id,name,parent_id',
+    filter,
+  );
+  if (advisorNodes) {
+    const rollups = rollupDirectUplines(
+      advisorNodes.map((row) => ({
+        id: String(row.id || ''),
+        parentId: row.parent_id ? String(row.parent_id) : null,
+        name: displayName(row.name),
+      })).filter((row) => row.id),
+      intel.map((row) => ({
+        advisorKey: String(row.advisor_id || ''),
+        mrr: Number(row.mrr || 0),
+        netMrr: Number(row.net_mrr || 0),
+        activeMembers: Number(row.active_members || 0),
+      })),
+      advisorQuality.map((row) => ({
+        key: row.qualityKey,
+        cohort90: row.cohort90,
+        survived90: row.survived90,
+      })),
+    );
+    if (rollups.length === 0) {
+      const { error } = await admin.from('fact_agent_upline').delete().eq('org_id', orgId);
+      if (error) throw error;
+    } else {
+      const uplineRows = rollups.map((row) => ({
+        org_id: orgId,
+        upline_key: row.uplineKey,
+        display_name: row.displayName,
+        downline_count: row.downlineCount,
+        mrr: row.mrr,
+        net_mrr: row.netMrr,
+        active_members: row.activeMembers,
+        mrr_share_pct: row.mrrSharePct,
+        early_cancel_pct: row.earlyCancelPct,
+        metadata: {},
+        updated_at: new Date().toISOString(),
+      }));
+      const { error } = await admin.from('fact_agent_upline').upsert(uplineRows, { onConflict: 'org_id,upline_key' });
+      if (error) throw error;
+      const keys = uplineRows.map((row) => row.upline_key);
+      const { error: dropError } = await admin
+        .from('fact_agent_upline')
+        .delete()
+        .eq('org_id', orgId)
+        .not('upline_key', 'in', `(${keys.map((key) => `"${key.replaceAll('"', '')}"`).join(',')})`);
+      if (dropError) throw dropError;
+    }
+  }
+
   const metrics = stats.length === 0 ? [] : [
     { metric_key: 'iq_active_members', value: Number(overview.active_members || 0) },
     { metric_key: 'iq_terminating_members', value: Number(overview.terminating_members || 0) },
@@ -763,6 +973,11 @@ export async function extractAdvisorIq(
     { metric_key: 'iq_enrollments_90', value: Number(overview.enrollments_90 || 0) },
     { metric_key: 'iq_active_agents', value: Number(overview.active_agents || 0) },
   ];
+  const leaving = mrrLeavingWithin90(forward.map((row) => ({
+    bucket: String(row.bucket || ''),
+    mrr: Number(row.mrr_at_risk || 0),
+  })));
+  if (leaving != null) metrics.push({ metric_key: 'iq_term_soon_mrr', value: leaving });
   for (const metric of metrics) {
     await upsertSnapshot(admin, orgId, 'aryx_advisoriq', metric.metric_key, metric.value, today);
   }
@@ -1029,13 +1244,13 @@ export async function extractTraffic(
     filter,
   );
 
-  const byDay = new Map<string, { sessions: number; users: number; pageviews: number; conversions: number }>();
+  const byDay = new Map<string, { sessions: number; leads: number; newMembers: number }>();
   for (const row of rows) {
     const day = String(row.date || today).slice(0, 10);
-    const cur = byDay.get(day) || { sessions: 0, users: 0, pageviews: 0, conversions: 0 };
+    const cur = byDay.get(day) || { sessions: 0, leads: 0, newMembers: 0 };
     cur.sessions += Number(row.traffic || 0);
-    cur.conversions += Number(row.leads || 0);
-    cur.users += Number(row.new_members || 0);
+    cur.leads += Number(row.leads || 0);
+    cur.newMembers += Number(row.new_members || 0);
     byDay.set(day, cur);
   }
 
@@ -1047,9 +1262,11 @@ export async function extractTraffic(
       fact_date: day,
       source: 'ga4',
       sessions: row.sessions,
-      users: row.users,
-      pageviews: row.pageviews,
-      conversions: row.conversions,
+      users: 0,
+      pageviews: 0,
+      conversions: 0,
+      leads: row.leads,
+      new_members: row.newMembers,
       metadata: {},
     }, { onConflict: 'org_id,fact_date,source' });
   }

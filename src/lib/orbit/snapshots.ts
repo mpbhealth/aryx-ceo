@@ -8,7 +8,18 @@ import {
   type PeriodKey,
 } from '@/lib/cos';
 import { computeForecast, forecastSentence, preferCompleteMonth } from '@/lib/forecast';
+import { mrrLeavingWithin90 } from '@/lib/cashOutlook';
+import {
+  churnNote,
+  movementBriefDeltas,
+  observedMonthlyChurn,
+  ownerBriefSentence,
+  pnlBriefDeltas,
+  snapshotBriefDelta,
+  withFallbackCurrent,
+} from '@/lib/ownerBrief';
 import { conversionRate, formatFact, sumTraffic, type TrafficFact } from '@/lib/marketingFacts';
+import { SAME_WINDOW_NOTE } from '@/lib/funnel';
 import { snapshotForPath, withExplanation } from './explain';
 import { formatOrbitPageReply } from './page-reply';
 import type { OrbitSnapshotKind } from './intent';
@@ -228,16 +239,24 @@ export function formatTrafficReply(input: {
   hasRows: boolean;
   sessions: number;
   conversions: number;
+  leads?: number;
+  newMembers?: number;
   period: PeriodKey;
 }): string {
   const label = periodLabel(input.period);
-  if (!input.linked) return `${notLinked('Traffic')}\n${label} sessions: —\nConversion: —`;
-  if (!input.hasRows) return `${emptyRows('traffic facts')}\n${label} sessions: —\nConversion: —`;
-  return [
+  if (!input.linked) return `${notLinked('Traffic')}\n${label} sessions: —\nLeads: —`;
+  if (!input.hasRows) return `${emptyRows('traffic facts')}\n${label} sessions: —\nLeads: —`;
+  const leads = input.leads ?? input.conversions;
+  const lines = [
     `${label} sessions: ${formatFact(compactNumber, { linked: true, hasRows: true, value: input.sessions })}`,
-    `${label} conversions: ${formatFact(compactNumber, { linked: true, hasRows: true, value: input.conversions })}`,
-    `Conversion: ${conversionRate(input.conversions, input.sessions)}`,
-  ].join('\n');
+    `${label} leads: ${formatFact(compactNumber, { linked: true, hasRows: true, value: leads })}`,
+    `Lead rate: ${conversionRate(leads, input.sessions)}`,
+    SAME_WINDOW_NOTE,
+  ];
+  if (input.newMembers != null) {
+    lines.splice(2, 0, `${label} new members: ${formatFact(compactNumber, { linked: true, hasRows: true, value: input.newMembers })}`);
+  }
+  return lines.join('\n');
 }
 
 export function formatSourceReply(input: {
@@ -457,7 +476,7 @@ export async function loadTrafficRows(scope: OrbitScope, period: PeriodKey): Pro
   const bounds = periodBounds(period, scope.customStart, scope.customEnd);
   const { data, error } = await supabase
     .from('fact_traffic_daily')
-    .select('fact_date, source, sessions, users, pageviews, conversions')
+    .select('fact_date, source, sessions, users, pageviews, conversions, leads, new_members')
     .in('org_id', scope.orgIds)
     .gte('fact_date', bounds.start)
     .lte('fact_date', bounds.end)
@@ -514,7 +533,7 @@ export async function loadForecastBundle(scope: OrbitScope) {
       .limit(4),
     supabase
       .from('fact_enrollments_daily')
-      .select('new_count, inactive_count, mrr')
+      .select('fact_date, new_count, inactive_count, active_count, mrr')
       .in('org_id', ids)
       .order('fact_date', { ascending: false })
       .limit(90),
@@ -548,6 +567,41 @@ function reply(text: string, href: string, label: string, kind: OrbitSnapshotKin
   return { text: withExplanation(text, kind, explain), href, label };
 }
 
+async function ownerDeskLead(scope: OrbitScope): Promise<string> {
+  if (scope.orgIds.length === 0) return '';
+  const since = new Date();
+  since.setUTCDate(since.getUTCDate() - 21);
+  const sinceDay = since.toISOString().slice(0, 10);
+  const [pnlRes, moveRes, snapRes, forward, enrollRes] = await Promise.all([
+    scope.linked.enrollment
+      ? supabase.from('fact_pnl_period').select('period_start, collected, failed, net_operating').in('org_id', scope.orgIds).eq('period_grain', 'month').order('period_start', { ascending: false }).limit(8)
+      : Promise.resolve({ data: [], error: null }),
+    scope.linked.advisoriq
+      ? supabase.from('fact_iq_mrr_monthly').select('month, enrollments, terminations').in('org_id', scope.orgIds).order('month', { ascending: false }).limit(6)
+      : Promise.resolve({ data: [], error: null }),
+    supabase.from('analytics_snapshots').select('metric_key, period_start, value').in('org_id', scope.orgIds).in('metric_key', ['iq_term_soon_mrr', 'open_ticket_count']).gte('period_start', sinceDay),
+    scope.linked.advisoriq ? loadForwardRiskRows(scope) : Promise.resolve([]),
+    scope.linked.enrollment
+      ? supabase.from('fact_enrollments_daily').select('fact_date, inactive_count, active_count').in('org_id', scope.orgIds).order('fact_date', { ascending: false }).limit(120)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  for (const result of [pnlRes, moveRes, snapRes, enrollRes]) {
+    if (result.error) throw result.error;
+  }
+  const pnl = pnlBriefDeltas((pnlRes.data || []) as Array<{ period_start: string; collected: number; failed: number; net_operating: number }>);
+  const movement = movementBriefDeltas((moveRes.data || []) as Array<{ month: string; enrollments: number; terminations: number }>);
+  const snaps = (snapRes.data || []) as Array<{ metric_key: string; period_start: string; value: number | null }>;
+  const leaving = mrrLeavingWithin90(forward.map((row) => ({ bucket: row.bucket, mrr: Number(row.mrr_at_risk) })));
+  const sentence = ownerBriefSentence({
+    ...pnl,
+    ...movement,
+    termSoonMrr: withFallbackCurrent(snapshotBriefDelta(snaps, 'iq_term_soon_mrr', 'MRR scheduled to leave'), leaving),
+    openTickets: snapshotBriefDelta(snaps, 'open_ticket_count', 'Open tickets'),
+  }, money, compactNumber);
+  const churn = observedMonthlyChurn((enrollRes.data || []) as Array<{ fact_date?: string; inactive_count: number; active_count?: number | null }>);
+  return `${sentence}\n${churnNote(churn)}`;
+}
+
 export async function loadOrbitSnapshot(
   kind: OrbitSnapshotKind,
   scope: OrbitScope,
@@ -568,7 +622,8 @@ export async function loadOrbitSnapshot(
       };
     }
     case 'desk': {
-      const [pnl, billing, tickets, pipeline, traffic, sources] = await Promise.all([
+      const [lead, pnl, billing, tickets, pipeline, traffic, sources] = await Promise.all([
+        ownerDeskLead(scope),
         loadOrbitSnapshot('pnl', scope, period),
         loadOrbitSnapshot('billing_risk', scope, period),
         loadOrbitSnapshot('tickets', scope, period),
@@ -577,6 +632,7 @@ export async function loadOrbitSnapshot(
         loadOrbitSnapshot('sources', scope, period),
       ]);
       const text = [
+        lead,
         `Desk briefing · ${periodLabel(period)}`,
         `EnrollFlow — ${pnl.text.split('\n').join(' · ')}`,
         `AdvisorIQ — ${billing.text.split('\n').join(' · ')}`,
@@ -691,6 +747,8 @@ export async function loadOrbitSnapshot(
         hasRows: rows.length > 0,
         sessions: totals.sessions,
         conversions: totals.conversions,
+        leads: totals.leads,
+        newMembers: totals.newMembers,
         period,
       }), '/marketing', 'Open Traffic', 'traffic', explain);
     }
@@ -710,16 +768,17 @@ export async function loadOrbitSnapshot(
     case 'forecast': {
       const bundle = await loadForecastBundle(scope);
       const hasInputs = bundle.pnl.length > 0;
+      const churn = observedMonthlyChurn(bundle.enroll);
       const computed = hasInputs
         ? computeForecast(
             { ...bundle, pnl: preferCompleteMonth(bundle.pnl) },
-            DEFAULT_FORECAST_ASSUMPTIONS,
+            { ...DEFAULT_FORECAST_ASSUMPTIONS, monthlyChurn: churn.rate },
           )
         : null;
       return reply(formatForecastReply({
         linked: scope.linked.enrollment,
         hasInputs,
-        sentence: computed ? forecastSentence(90, computed.pnl, money) : null,
+        sentence: computed ? `${forecastSentence(90, computed.pnl, money)} ${churnNote(churn)}` : null,
         lastSaved: bundle.lastRun?.created_at
           ? new Date(bundle.lastRun.created_at).toLocaleString()
           : null,

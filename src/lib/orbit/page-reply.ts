@@ -32,6 +32,12 @@ const PAGE_COPY: Record<string, PageCopy> = {
       'Read collected and NOI from fact_pnl_period. Export CSV if you are an operator.',
     ],
   },
+  '/finance/cash': {
+    sentence: 'Cash pace. Ninety-day run-rate from the last complete billing month, minus carrier cost, commissions, and MRR already scheduled to leave.',
+    href: '/finance/cash',
+    label: 'Open Cash',
+    can: ['Read collected, pending, and failed by month. This page does not show recovered cash.'],
+  },
   '/finance/vendors': {
     sentence: 'Vendors. Carrier cost rows and unmatched enrollments from the warehouse.',
     href: '/finance/vendors',
@@ -81,10 +87,10 @@ const PAGE_COPY: Record<string, PageCopy> = {
     can: ['Open a record. I do not create or update CRM rows.'],
   },
   '/marketing': {
-    sentence: 'Traffic. MarketFlow / GA4 sessions and conversions when the source is linked.',
+    sentence: 'Traffic. Same-window sessions, leads, and new members, plus the day-90 plan cohort when EnrollFlow quality is in the warehouse.',
     href: '/marketing',
     label: 'Open Traffic',
-    can: ['Read sessions and conversion for the desk period when traffic is linked.'],
+    can: ['Read same-window sessions, leads, and new members. Day-90 survival is a separate cohort.'],
   },
   '/inbox': {
     sentence: 'Inbox. Connected mailbox threads. I do not send mail.',

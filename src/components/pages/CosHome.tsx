@@ -5,6 +5,18 @@ import { supabase } from '@/lib/supabase';
 import { syncConnectors } from '@/lib/connectors';
 import { money, compactNumber, periodBounds, grainForPeriod, ADVISORIQ_HREF } from '@/lib/cos';
 import { computeForecast, forecastSentence, preferCompleteMonth } from '@/lib/forecast';
+import { mrrLeavingWithin90 } from '@/lib/cashOutlook';
+import { isRevenueBlockingCategory, latestFutureActive } from '@/lib/bookQuality';
+import {
+  churnNote,
+  movementBriefDeltas,
+  observedMonthlyChurn,
+  ownerBriefSentence,
+  pnlBriefDeltas,
+  rankOwnerActions,
+  snapshotBriefDelta,
+  withFallbackCurrent,
+} from '@/lib/ownerBrief';
 import { conversionRate, formatFact } from '@/lib/marketingFacts';
 import { useTrafficFacts } from '@/hooks/useTrafficFacts';
 import { useOrg } from '@/contexts/OrgContext';
@@ -142,7 +154,7 @@ export function CosHome() {
     queryFn: async () => {
       const [{ data: pnlRows }, { data: enroll }, { data: pipe }] = await Promise.all([
         supabase.from('fact_pnl_period').select('period_start, collected, vendor_cost, commissions, saas_cost, active_members').in('org_id', orgIds).eq('period_grain', 'month').order('period_start', { ascending: false }).limit(4),
-        supabase.from('fact_enrollments_daily').select('new_count, inactive_count, mrr').in('org_id', orgIds).order('fact_date', { ascending: false }).limit(90),
+        supabase.from('fact_enrollments_daily').select('fact_date, new_count, inactive_count, active_count, mrr').in('org_id', orgIds).order('fact_date', { ascending: false }).limit(120),
         supabase.from('fact_crm_pipeline_daily').select('weighted_amount, premium_sum, aging_over_7, metadata').in('org_id', orgIds).order('fact_date', { ascending: false }).limit(40),
       ]);
       return { pnl: pnlRows || [], enroll: enroll || [], pipe: pipe || [] };
@@ -174,6 +186,50 @@ export function CosHome() {
         .from('integration_sources')
         .select('key, status, last_success_at, last_error')
         .eq('org_id', orgId);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const briefPnl = useQuery({
+    queryKey: ['brief-pnl', orgIds.join(',')],
+    enabled: orgIds.length > 0 && linked.enrollment,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fact_pnl_period')
+        .select('period_start, collected, failed, net_operating')
+        .in('org_id', orgIds)
+        .eq('period_grain', 'month')
+        .order('period_start', { ascending: false })
+        .limit(8);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const enrollmentOps = useQuery({
+    queryKey: ['enrollment-ops', orgIds.join(',')],
+    enabled: orgIds.length > 0 && linked.enrollment,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fact_enrollment_ops')
+        .select('org_id, fact_date, future_active_count')
+        .in('org_id', orgIds)
+        .order('fact_date', { ascending: false })
+        .limit(24);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const openTickets = useQuery({
+    queryKey: ['book-ticket-categories', orgIds.join(',')],
+    enabled: orgIds.length > 0 && linked.tickets,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('book_tickets')
+        .select('category')
+        .in('org_id', orgIds);
       if (error) throw error;
       return data || [];
     },
@@ -241,18 +297,67 @@ export function CosHome() {
     }), { collected: 0, pending: 0, failed: 0, vendor: 0, commissions: 0, saas: 0, net: 0, pendingCommissions: 0, coverage: 100 });
   }, [pnl.data]);
 
+  const churn = useMemo(
+    () => observedMonthlyChurn(forecastFacts.data?.enroll || []),
+    [forecastFacts.data],
+  );
+
   const forecast = useMemo(() => {
     if (!forecastFacts.data) return null;
     return computeForecast({ ...forecastFacts.data, pnl: preferCompleteMonth(forecastFacts.data.pnl) }, {
       horizonDays: 90,
       weeklyWeeks: 8,
       seasonality: 1,
-      monthlyChurn: 0.03,
+      monthlyChurn: churn.rate,
       winRate: 0.25,
       pessimistic: 0.7,
       optimistic: 1.25,
     });
-  }, [forecastFacts.data]);
+  }, [churn.rate, forecastFacts.data]);
+
+  const ownerBrief = useMemo(() => {
+    const pnl = pnlBriefDeltas(briefPnl.data || []);
+    const movement = movementBriefDeltas((book.data?.trend || []).map((row) => ({
+      month: String(row.month),
+      enrollments: Number(row.enrollments),
+      terminations: Number(row.terminations),
+    })));
+    const leaving = mrrLeavingWithin90((book.data?.risk || []).map((row) => ({
+      bucket: String(row.bucket),
+      mrr: Number(row.mrr_at_risk),
+    })));
+    const snaps = (snapshots.data || []).map((row) => ({
+      metric_key: row.metric_key,
+      period_start: row.period_start,
+      value: row.value,
+    }));
+    const brief = {
+      ...pnl,
+      ...movement,
+      termSoonMrr: withFallbackCurrent(snapshotBriefDelta(snaps, 'iq_term_soon_mrr', 'MRR scheduled to leave'), leaving),
+      openTickets: snapshotBriefDelta(snaps, 'open_ticket_count', 'Open tickets'),
+    };
+    const actions = rankOwnerActions({
+      actions: (book.data?.actions || []).map((row) => ({
+        key: row.action_key,
+        title: row.title || row.kind || 'Action',
+        dollars: row.dollars == null ? null : Number(row.dollars),
+        href: iqHref(row.href),
+      })),
+      billing: (book.data?.billing || []).map((row) => ({
+        key: `${row.member_key}-${row.product_key}`,
+        title: row.display_name || 'Billing risk',
+        dollars: Number(row.monthly_fee || 0),
+        href: iqHref('/command'),
+      })),
+      termSoon: leaving == null ? null : {
+        title: 'MRR scheduled to leave',
+        dollars: leaving,
+        href: '/enrollments',
+      },
+    });
+    return { brief, actions, sentence: ownerBriefSentence(brief, money, compactNumber) };
+  }, [book.data, briefPnl.data, snapshots.data]);
 
   const pipeLatest = forecastFacts.data?.pipe?.[0];
   const aging = (forecastFacts.data?.pipe || []).reduce((sum, row) => sum + Number(row.aging_over_7 || 0), 0);
@@ -300,7 +405,7 @@ export function CosHome() {
         title="The whole book."
         lede={
           forecast
-            ? forecastSentence(90, forecast.pnl, money)
+            ? `${forecastSentence(90, forecast.pnl, money)} ${churnNote(churn)}`
             : 'Members, advisors, billing, and payables. Action stays in AdvisorIQ and EnrollFlow.'
         }
         actions={
@@ -329,6 +434,54 @@ export function CosHome() {
       />
 
         <div className="space-y-6">
+          <CosBezel>
+            <h2 className="mb-3 text-[10px] uppercase tracking-[0.2em] text-aryx-faint">Monday brief</h2>
+            <p className="text-sm text-aryx-ink">{ownerBrief.sentence}</p>
+            <div className="mt-5 grid grid-cols-1 gap-4 xs:grid-cols-2 xl:grid-cols-3">
+              {[ownerBrief.brief.net, ownerBrief.brief.failed, ownerBrief.brief.collected, ownerBrief.brief.termSoonMrr].map((row) => (
+                <CommandStat
+                  key={row.key}
+                  label={row.label}
+                  value={row.current == null ? '—' : money(row.current)}
+                  hint={row.delta == null ? undefined : `${row.delta > 0 ? '+' : ''}${money(row.delta)} versus ${row.versus}`}
+                />
+              ))}
+              <CommandStat
+                label="Open tickets"
+                value={ownerBrief.brief.openTickets.current == null ? '—' : compactNumber(ownerBrief.brief.openTickets.current)}
+                hint={ownerBrief.brief.openTickets.delta == null ? undefined : `${ownerBrief.brief.openTickets.delta > 0 ? '+' : ''}${compactNumber(ownerBrief.brief.openTickets.delta)} versus 7 days ago`}
+              />
+              <CommandStat
+                label="Gained"
+                value={ownerBrief.brief.gained.current == null ? '—' : compactNumber(ownerBrief.brief.gained.current)}
+                hint={ownerBrief.brief.gained.delta == null ? undefined : `${ownerBrief.brief.gained.delta > 0 ? '+' : ''}${compactNumber(ownerBrief.brief.gained.delta)} versus last month`}
+              />
+              <CommandStat
+                label="Lost"
+                value={ownerBrief.brief.lost.current == null ? '—' : compactNumber(ownerBrief.brief.lost.current)}
+                hint={ownerBrief.brief.lost.delta == null ? undefined : `${ownerBrief.brief.lost.delta > 0 ? '+' : ''}${compactNumber(ownerBrief.brief.lost.delta)} versus last month`}
+              />
+            </div>
+            <div className="mt-6">
+              <p className="mb-3 text-[10px] uppercase tracking-[0.16em] text-aryx-faint">Do this</p>
+              {ownerBrief.actions.length === 0 ? (
+                <p className="text-sm text-aryx-muted">No dollar-ranked actions in the warehouse.</p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {ownerBrief.actions.map((action) => (
+                    <li key={action.key} className="flex justify-between gap-4">
+                      {action.href.startsWith('http') ? (
+                        <a href={action.href} className="text-aryx-accent" target="_blank" rel="noreferrer">{action.title}</a>
+                      ) : (
+                        <Link to={action.href || '/home'} className="text-aryx-accent">{action.title}</Link>
+                      )}
+                      <span className="text-aryx-faint">{money(action.dollars)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </CosBezel>
           {linked.advisoriq && tideHistory.length > 0 && (
             <MovementTide
               history={tideHistory}
@@ -432,13 +585,18 @@ export function CosHome() {
               hint="Website"
             />
             <CommandStat
-              label="Conversions"
-              value={formatFact(compactNumber, { linked: linked.traffic, loading: traffic.isLoading, hasRows: hasTrafficRows, value: marketing.conversions })}
-              hint="GA / MarketFlow"
+              label="Leads"
+              value={formatFact(compactNumber, { linked: linked.traffic, loading: traffic.isLoading, hasRows: hasTrafficRows, value: marketing.leads })}
+              hint="MarketFlow"
             />
             <CommandStat
-              label="Conv. rate"
-              value={linked.traffic && hasTrafficRows ? conversionRate(marketing.conversions, marketing.sessions) : '—'}
+              label="New members"
+              value={formatFact(compactNumber, { linked: linked.traffic, loading: traffic.isLoading, hasRows: hasTrafficRows, value: marketing.newMembers })}
+              hint="MarketFlow, not EnrollFlow"
+            />
+            <CommandStat
+              label="Lead rate"
+              value={linked.traffic && hasTrafficRows ? conversionRate(marketing.leads, marketing.sessions) : '—'}
             />
           </CommandStrip>
 
@@ -469,6 +627,30 @@ export function CosHome() {
             )}
             {linked.crm && (
               <CommandStat label="CRM aging 7d+" value={compactNumber(aging)} />
+            )}
+            {linked.enrollment && (
+              <CommandStat
+                label="Waiting to start"
+                value={formatFact(compactNumber, {
+                  linked: linked.enrollment,
+                  loading: enrollmentOps.isLoading,
+                  hasRows: (enrollmentOps.data || []).length > 0,
+                  value: latestFutureActive(enrollmentOps.data || []) || 0,
+                })}
+                hint="Future Active"
+              />
+            )}
+            {linked.tickets && (
+              <CommandStat
+                label="Billing or enrollment tickets"
+                value={formatFact(compactNumber, {
+                  linked: linked.tickets,
+                  loading: openTickets.isLoading,
+                  hasRows: (openTickets.data || []).length > 0,
+                  value: (openTickets.data || []).filter((row) => isRevenueBlockingCategory(row.category)).length,
+                })}
+                hint="Open queue"
+              />
             )}
           </CommandStrip>
         </div>

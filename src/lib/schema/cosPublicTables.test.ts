@@ -18,6 +18,10 @@ describe('shouldQueryCosTable', () => {
     expect(shouldQueryCosTable('book_actions')).toBe(true);
     expect(shouldQueryCosTable('fact_ticket_mix')).toBe(true);
     expect(shouldQueryCosTable('book_tickets')).toBe(true);
+    expect(shouldQueryCosTable('fact_book_quality')).toBe(true);
+    expect(shouldQueryCosTable('fact_enrollment_ops')).toBe(true);
+    expect(shouldQueryCosTable('fact_agent_upline')).toBe(true);
+    expect(shouldQueryCosTable('marketing_spend')).toBe(true);
   });
 
   it('blocks leftover MPB tables that 404 on COS', () => {

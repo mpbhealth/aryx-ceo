@@ -25,7 +25,7 @@ describe('COS module navigation', () => {
     expect(byCategory.get('advisors')).toEqual(['advisors']);
     expect(byCategory.get('marketing')).toEqual(['marketing']);
     expect(byCategory.get('crm')).toEqual(['crm-records', 'pipeline']);
-    expect(byCategory.get('finance')).toEqual(['finance-pnl', 'finance-vendors', 'finance-forecast']);
+    expect(byCategory.get('finance')).toEqual(['finance-pnl', 'finance-cash', 'finance-vendors', 'finance-forecast']);
     expect(byCategory.get('support')).toEqual(['tickets', 'ticket-analytics']);
   });
 

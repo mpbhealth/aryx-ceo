@@ -59,6 +59,7 @@ export const cosNavigationItems: NavItem[] = [
   { id: 'crm-records', label: 'Records', path: '/crm', icon: Briefcase, category: 'crm', requires: 'crm' },
   { id: 'pipeline', label: 'Pipeline', path: '/pipeline', icon: LineChart, category: 'crm', requires: 'crm' },
   { id: 'finance-pnl', label: 'P&L', path: '/finance', icon: Wallet, category: 'finance' },
+  { id: 'finance-cash', label: 'Cash', path: '/finance/cash', icon: Wallet, category: 'finance' },
   { id: 'finance-vendors', label: 'Vendors', path: '/finance/vendors', icon: Wallet, category: 'finance' },
   { id: 'finance-forecast', label: 'Forecasts', path: '/finance/forecast', icon: LineChart, category: 'finance' },
   { id: 'tickets', label: 'Queue', path: '/tickets', icon: Ticket, category: 'support', requires: 'tickets' },

@@ -56,6 +56,10 @@ export const COS_PUBLIC_TABLES = new Set<string>([
   'fact_ticket_aging',
   'fact_ticket_agents',
   'book_tickets',
+  'fact_book_quality',
+  'fact_enrollment_ops',
+  'fact_agent_upline',
+  'marketing_spend',
 ]);
 
 export function shouldQueryCosTable(table: string): boolean {

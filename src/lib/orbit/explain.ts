@@ -8,7 +8,7 @@ export const ORBIT_GLOSS: Record<Exclude<OrbitSnapshotKind, 'explain_page' | 'de
   billing_risk: 'Billing risk is AdvisorIQ members the book flagged before the next bill. Action stays in AdvisorIQ.',
   pipeline: 'Weighted pipeline is CRM if-closed, not EnrollFlow collected. Aging >7d means the record has not moved.',
   tickets: 'On Command I quote analytics_snapshots ticket counts. On the queue I quote the latest fact_tickets_daily row and book_tickets. I do not create or update tickets.',
-  traffic: 'Sessions and conversions are MarketFlow / GA4 daily facts. I do not invent traffic when the source is unlinked.',
+  traffic: 'Sessions, leads, and new members are MarketFlow daily facts for the same window. They are not the same people. I do not invent traffic when the source is unlinked.',
   sources: 'Source health is last extract status on integration_sources. Refresh is an operator confirm, not a silent write.',
   vendor: 'Unmatched vendor cost means active enrollments with no carrier cost row. Coverage below 100% is a book gap, not $0 cost.',
   forecast: '90-day net is trailing run-rate × assumptions ± CRM weighted pipeline. It is not a guarantee and not collected.',

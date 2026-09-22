@@ -16,8 +16,8 @@ const rows = [
 
 describe('marketingFacts', () => {
   it('sums warehouse traffic without inventing zeros from missing rows', () => {
-    expect(sumTraffic(rows)).toEqual({ sessions: 170, users: 138, pageviews: 360, conversions: 5 });
-    expect(sumTraffic([])).toEqual({ sessions: 0, users: 0, pageviews: 0, conversions: 0 });
+    expect(sumTraffic(rows)).toEqual({ sessions: 170, users: 138, pageviews: 360, conversions: 5, leads: 0, newMembers: 0 });
+    expect(sumTraffic([])).toEqual({ sessions: 0, users: 0, pageviews: 0, conversions: 0, leads: 0, newMembers: 0 });
   });
 
   it('groups by source and day', () => {

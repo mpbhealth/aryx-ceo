@@ -21,6 +21,7 @@ const CosInbox = lazy(() => import('./components/pages/CosInbox'));
 const CosCrmList = lazy(() => import('./components/pages/CosCrmList'));
 const CosCrmDetail = lazy(() => import('./components/pages/CosCrmDetail'));
 const CosFinance = lazy(() => import('./components/pages/CosFinance'));
+const CosCash = lazy(() => import('./components/pages/CosCash'));
 const CosVendors = lazy(() => import('./components/pages/CosVendors'));
 const CosForecast = lazy(() => import('./components/pages/CosForecast'));
 const CosEnrollments = lazy(() => import('./components/pages/CosEnrollments'));
@@ -172,6 +173,7 @@ function CosContent() {
             <Route path="/crm" element={<CosCrmList />} />
             <Route path="/crm/:kind/:id" element={<CosCrmDetail />} />
             <Route path="/finance" element={<CosFinance />} />
+            <Route path="/finance/cash" element={<CosCash />} />
             <Route path="/finance/vendors" element={<CosVendors />} />
             <Route path="/finance/forecast" element={<CosForecast />} />
             <Route path="/enrollments" element={<CosEnrollments />} />

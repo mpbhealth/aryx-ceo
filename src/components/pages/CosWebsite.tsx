@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { compactNumber, periodBounds } from '@/lib/cos';
+import { compactNumber, money, periodBounds } from '@/lib/cos';
 import { conversionRate, formatFact, sourceLabel } from '@/lib/marketingFacts';
+import { companySurvival, costPerSurvivor, COHORT_NOTE, SAME_WINDOW_NOTE } from '@/lib/funnel';
 import { downloadCsv } from '@/lib/exportFacts';
 import { useTrafficFacts } from '@/hooks/useTrafficFacts';
 import { useOrg } from '@/contexts/OrgContext';
@@ -11,9 +12,13 @@ import { CosBezel, CosIslandButton, CosPage, CosPageHero, CosTable } from '../co
 import { OrgPicker } from '../cos/OrgPicker';
 import { PeriodToggle } from '../cos/PeriodToggle';
 import { TrendSpark } from '../cos/TrendSpark';
+import { CommandStat, CommandStrip } from '../cos/CommandStrip';
 
 export function CosWebsite() {
+  const queryClient = useQueryClient();
   const { orgId, linked, rollup, memberships, isOperator } = useOrg();
+  const [spendMonth, setSpendMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [spendAmount, setSpendAmount] = useState('');
   const { period, customStart, customEnd, setPeriod, setCustomRange } = useDeskPeriod();
   const bounds = periodBounds(period, customStart, customEnd);
   const orgIds = rollup ? memberships.map((row) => row.org_id) : orgId ? [orgId] : [];
@@ -52,6 +57,51 @@ export function CosWebsite() {
     },
   });
 
+  const spend = useQuery({
+    queryKey: ['marketing-spend', orgIds.join(',')],
+    enabled: orgIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('marketing_spend')
+        .select('period_start, amount')
+        .in('org_id', orgIds)
+        .order('period_start', { ascending: false })
+        .limit(24);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const survival = useQuery({
+    queryKey: ['company-survival', orgIds.join(',')],
+    enabled: orgIds.length > 0 && linked.enrollment,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fact_book_quality')
+        .select('cohort_90, survived_90')
+        .in('org_id', orgIds)
+        .eq('grain', 'product');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const saveSpend = useMutation({
+    mutationFn: async () => {
+      if (!orgId || rollup) return;
+      const amount = Number(spendAmount);
+      if (!Number.isFinite(amount)) return;
+      const { error } = await supabase.from('marketing_spend').upsert({
+        org_id: orgId,
+        period_start: `${spendMonth}-01`,
+        amount,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'org_id,period_start' });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['marketing-spend'] }),
+  });
+
   const leadCount = useMemo(
     () => (leads.data || []).reduce((sum, row) => sum + Number(row.lead_count || 0), 0),
     [leads.data],
@@ -61,6 +111,10 @@ export function CosWebsite() {
     [enrolls.data],
   );
 
+  const cohort = companySurvival(survival.data || []);
+  const monthSpendRows = (spend.data || []).filter((row) => String(row.period_start).slice(0, 7) === spendMonth);
+  const monthSpend = monthSpendRows.length === 0 ? null : monthSpendRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const survivorCost = costPerSurvivor(monthSpend, cohort?.survived ?? null);
   const hasTraffic = traffic.rows.length > 0;
   const sessionValue = formatFact(compactNumber, {
     linked: linked.traffic,
@@ -144,23 +198,23 @@ export function CosWebsite() {
               xKey="date"
               series={[
                 { key: 'sessions', color: '#FF5A1F' },
-                { key: 'conversions', color: '#2F9E44' },
+                { key: 'leads', color: '#2F9E44' },
               ]}
             />
           </div>
         </CosBezel>
 
         <CosBezel className="cos-rise-2 md:col-span-5">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-aryx-faint">Users</p>
+          <p className="text-[10px] uppercase tracking-[0.18em] text-aryx-faint">Leads</p>
           <p className="mt-3 font-display text-4xl font-semibold tracking-tight">
             {formatFact(compactNumber, {
               linked: linked.traffic,
               loading: traffic.isLoading,
               hasRows: hasTraffic,
-              value: traffic.totals.users,
+              value: traffic.totals.leads,
             })}
           </p>
-          <p className="mt-2 text-xs text-aryx-faint">Mapped from MarketFlow new members</p>
+          <p className="mt-2 text-xs text-aryx-faint">MarketFlow leads for this window</p>
         </CosBezel>
 
         <CosBezel className="cos-rise-2 md:col-span-5">
@@ -177,21 +231,16 @@ export function CosWebsite() {
         </CosBezel>
 
         <CosBezel className="cos-rise-3 md:col-span-4">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-aryx-faint">Conversions</p>
+          <p className="text-[10px] uppercase tracking-[0.18em] text-aryx-faint">New members</p>
           <p className="mt-3 font-display text-4xl font-semibold tracking-tight">
             {formatFact(compactNumber, {
               linked: linked.traffic,
               loading: traffic.isLoading,
               hasRows: hasTraffic,
-              value: traffic.totals.conversions,
+              value: traffic.totals.newMembers,
             })}
           </p>
-          <p className="mt-2 text-xs text-aryx-faint">
-            {linked.traffic && hasTraffic
-              ? conversionRate(traffic.totals.conversions, traffic.totals.sessions)
-              : '—'}{' '}
-            of sessions
-          </p>
+          <p className="mt-2 text-xs text-aryx-faint">MarketFlow new members. Not EnrollFlow.</p>
         </CosBezel>
 
         <CosBezel className="cos-rise-3 md:col-span-4">
@@ -221,6 +270,59 @@ export function CosWebsite() {
         </CosBezel>
       </div>
 
+      <div className="mt-10 space-y-6">
+        <CommandStrip title="Same window">
+          <CommandStat label="Sessions" value={sessionValue} hint={SAME_WINDOW_NOTE} />
+          <CommandStat
+            label="Leads"
+            value={formatFact(compactNumber, { linked: linked.traffic, loading: traffic.isLoading, hasRows: hasTraffic, value: traffic.totals.leads })}
+          />
+          <CommandStat
+            label="MarketFlow new members"
+            value={formatFact(compactNumber, { linked: linked.traffic, loading: traffic.isLoading, hasRows: hasTraffic, value: traffic.totals.newMembers })}
+          />
+          <CommandStat
+            label="EnrollFlow new"
+            value={formatFact(compactNumber, { linked: linked.enrollment, loading: enrolls.isLoading, hasRows: (enrolls.data || []).length > 0, value: enrollCount })}
+          />
+        </CommandStrip>
+        <CommandStrip title="Day 90 cohort">
+          <CommandStat
+            label="Still active"
+            value={cohort ? `${compactNumber(cohort.survived)}/${compactNumber(cohort.cohort)}` : '—'}
+            hint={COHORT_NOTE}
+          />
+          <CommandStat
+            label="Spend this month"
+            value={monthSpend == null ? '—' : money(monthSpend)}
+          />
+          <CommandStat
+            label="Spend per survivor"
+            value={survivorCost == null ? '—' : money(survivorCost)}
+            hint="Only when this month's spend and the day-90 cohort both exist"
+          />
+        </CommandStrip>
+        {isOperator && (
+          <form
+            className="flex flex-col gap-3 rounded-[1.5rem] bg-aryx-elevated p-5 ring-1 ring-aryx-line md:flex-row md:items-end"
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveSpend.mutate();
+            }}
+          >
+            <label className="text-xs text-aryx-muted">Month
+              <input type="month" value={spendMonth} onChange={(event) => setSpendMonth(event.target.value)} className="mt-1 block rounded-xl border border-aryx-line bg-aryx-bg px-3 py-2 text-aryx-ink" />
+            </label>
+            <label className="text-xs text-aryx-muted">Marketing spend
+              <input type="number" min="0" step="0.01" value={spendAmount} onChange={(event) => setSpendAmount(event.target.value)} className="mt-1 block rounded-xl border border-aryx-line bg-aryx-bg px-3 py-2 text-aryx-ink" />
+            </label>
+            <button type="submit" disabled={rollup || saveSpend.isPending} className="rounded-full bg-aryx-accent px-5 py-2 text-sm text-white disabled:opacity-50">
+              {rollup ? 'Pick one organization' : 'Save spend'}
+            </button>
+          </form>
+        )}
+      </div>
+
       <div className="cos-rise-4 mt-10">
         <p className="mb-4 text-[10px] uppercase tracking-[0.2em] text-aryx-faint">Sources</p>
         {traffic.bySource.length === 0 ? (
@@ -232,10 +334,10 @@ export function CosWebsite() {
                 <tr>
                   <th className="py-2 pr-4">Source</th>
                   <th className="pr-4">Sessions</th>
-                  <th className="pr-4">Users</th>
+                  <th className="pr-4">Leads</th>
+                  <th className="pr-4">New members</th>
                   <th className="pr-4">Pageviews</th>
-                  <th className="pr-4">Conversions</th>
-                  <th>Rate</th>
+                  <th>Lead rate</th>
                 </tr>
               </thead>
               <tbody>
@@ -243,10 +345,10 @@ export function CosWebsite() {
                   <tr key={row.source} className="border-t border-aryx-line/80">
                     <td className="py-3.5 pr-4">{sourceLabel(row.source)}</td>
                     <td className="pr-4">{compactNumber(row.sessions)}</td>
-                    <td className="pr-4">{compactNumber(row.users)}</td>
+                    <td className="pr-4">{compactNumber(row.leads)}</td>
+                    <td className="pr-4">{compactNumber(row.newMembers)}</td>
                     <td className="pr-4">{compactNumber(row.pageviews)}</td>
-                    <td className="pr-4">{compactNumber(row.conversions)}</td>
-                    <td>{conversionRate(row.conversions, row.sessions)}</td>
+                    <td>{conversionRate(row.leads, row.sessions)}</td>
                   </tr>
                 ))}
               </tbody>

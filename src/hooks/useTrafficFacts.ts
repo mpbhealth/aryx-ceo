@@ -23,7 +23,7 @@ export function useTrafficFacts(
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fact_traffic_daily')
-        .select('fact_date, source, sessions, users, pageviews, conversions')
+        .select('fact_date, source, sessions, users, pageviews, conversions, leads, new_members')
         .in('org_id', orgIds)
         .gte('fact_date', start)
         .lte('fact_date', end)

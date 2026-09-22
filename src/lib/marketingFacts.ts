@@ -5,6 +5,8 @@ export type TrafficFact = {
   users: number | null;
   pageviews: number | null;
   conversions: number | null;
+  leads?: number | null;
+  new_members?: number | null;
 };
 
 export type TrafficTotals = {
@@ -12,6 +14,8 @@ export type TrafficTotals = {
   users: number;
   pageviews: number;
   conversions: number;
+  leads: number;
+  newMembers: number;
 };
 
 export function sumTraffic(rows: TrafficFact[]): TrafficTotals {
@@ -21,8 +25,10 @@ export function sumTraffic(rows: TrafficFact[]): TrafficTotals {
       users: acc.users + Number(row.users || 0),
       pageviews: acc.pageviews + Number(row.pageviews || 0),
       conversions: acc.conversions + Number(row.conversions || 0),
+      leads: acc.leads + Number(row.leads || 0),
+      newMembers: acc.newMembers + Number(row.new_members || 0),
     }),
-    { sessions: 0, users: 0, pageviews: 0, conversions: 0 },
+    { sessions: 0, users: 0, pageviews: 0, conversions: 0, leads: 0, newMembers: 0 },
   );
 }
 
@@ -30,11 +36,13 @@ export function trafficBySource(rows: TrafficFact[]): Array<TrafficTotals & { so
   const map = new Map<string, TrafficTotals>();
   for (const row of rows) {
     const key = row.source || 'unknown';
-    const cur = map.get(key) || { sessions: 0, users: 0, pageviews: 0, conversions: 0 };
+    const cur = map.get(key) || { sessions: 0, users: 0, pageviews: 0, conversions: 0, leads: 0, newMembers: 0 };
     cur.sessions += Number(row.sessions || 0);
     cur.users += Number(row.users || 0);
     cur.pageviews += Number(row.pageviews || 0);
     cur.conversions += Number(row.conversions || 0);
+    cur.leads += Number(row.leads || 0);
+    cur.newMembers += Number(row.new_members || 0);
     map.set(key, cur);
   }
   return [...map.entries()]
@@ -46,11 +54,13 @@ export function trafficByDay(rows: TrafficFact[]): Array<TrafficTotals & { date:
   const map = new Map<string, TrafficTotals>();
   for (const row of rows) {
     const key = row.fact_date;
-    const cur = map.get(key) || { sessions: 0, users: 0, pageviews: 0, conversions: 0 };
+    const cur = map.get(key) || { sessions: 0, users: 0, pageviews: 0, conversions: 0, leads: 0, newMembers: 0 };
     cur.sessions += Number(row.sessions || 0);
     cur.users += Number(row.users || 0);
     cur.pageviews += Number(row.pageviews || 0);
     cur.conversions += Number(row.conversions || 0);
+    cur.leads += Number(row.leads || 0);
+    cur.newMembers += Number(row.new_members || 0);
     map.set(key, cur);
   }
   return [...map.entries()]

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { compactNumber, money, ADVISORIQ_HREF } from '@/lib/cos';
+import { earlyCancelPct } from '@/lib/bookQuality';
 import { useOrg } from '@/contexts/OrgContext';
 import { OrgPicker } from '../cos/OrgPicker';
 import { CommandStat, CommandStrip } from '../cos/CommandStrip';
@@ -61,6 +62,34 @@ export function CosAdvisors() {
     },
   });
 
+  const quality = useQuery({
+    queryKey: ['book-quality-advisor', orgIds.join(',')],
+    enabled: orgIds.length > 0 && linked.advisoriq,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fact_book_quality')
+        .select('quality_key, cohort_90, survived_90, contribution')
+        .in('org_id', orgIds)
+        .eq('grain', 'advisor');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const upline = useQuery({
+    queryKey: ['agent-upline', orgIds.join(',')],
+    enabled: orgIds.length > 0 && linked.advisoriq,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fact_agent_upline')
+        .select('upline_key, display_name, downline_count, mrr, net_mrr, active_members, mrr_share_pct, early_cancel_pct')
+        .in('org_id', orgIds)
+        .order('mrr', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   const billing = useQuery({
     queryKey: ['book-billing-risk', orgIds.join(',')],
     enabled: orgIds.length > 0 && linked.advisoriq,
@@ -100,6 +129,16 @@ export function CosAdvisors() {
   }, [rows.data]);
 
   const mixMax = Math.max(1, ...(mix.data || []).map((row) => Number(row.mrr)));
+  const qualityByAdvisor = useMemo(() => {
+    const map = new Map<string, { early: number | null; contribution: number | null }>();
+    for (const row of quality.data || []) {
+      map.set(row.quality_key, {
+        early: earlyCancelPct(Number(row.cohort_90), Number(row.survived_90)),
+        contribution: row.contribution == null ? null : Number(row.contribution),
+      });
+    }
+    return map;
+  }, [quality.data]);
 
   if (!linked.advisoriq) {
     return <Unlinked title="Advisors" message="AdvisorIQ is not linked. ARYX CEO will not rebuild book scorecards." />;
@@ -127,6 +166,38 @@ export function CosAdvisors() {
           <CommandStat label="Top-10 concentration" value={`${rollupStats.concentration}%`} />
         </CommandStrip>
       </div>
+      {(upline.data || []).length > 0 && (
+        <div className="mt-8">
+          <h2 className="mb-3 text-sm uppercase tracking-[0.16em] text-aryx-faint">Upline</h2>
+          <p className="mb-3 text-xs text-aryx-faint">Direct downline only. Early cancel appears when AdvisorIQ exposes agent survival.</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-[10px] uppercase tracking-[0.16em] text-aryx-faint">
+                <tr>
+                  <th className="py-2">Upline</th>
+                  <th>Downline</th>
+                  <th>MRR</th>
+                  <th>Net</th>
+                  <th>Share</th>
+                  <th>Early cancel 90d</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(upline.data || []).map((row) => (
+                  <tr key={row.upline_key} className="border-t border-aryx-line">
+                    <td className="py-3">{row.display_name || row.upline_key.slice(0, 8)}</td>
+                    <td>{compactNumber(row.downline_count)}</td>
+                    <td>{money(Number(row.mrr))}</td>
+                    <td>{money(Number(row.net_mrr))}</td>
+                    <td>{row.mrr_share_pct == null ? '—' : `${row.mrr_share_pct}%`}</td>
+                    <td>{row.early_cancel_pct == null ? '—' : `${row.early_cancel_pct}%`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       {(mix.data || []).length > 0 && (
         <div className="mt-8">
           <h2 className="mb-3 text-sm uppercase tracking-[0.16em] text-aryx-faint">Product mix</h2>
@@ -198,10 +269,14 @@ export function CosAdvisors() {
               <th>New 90d</th>
               <th>MRR +90d</th>
               <th>Margin</th>
+              <th>Early cancel 90d</th>
+              <th>Contribution</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((row) => (
+            {filtered.map((row) => {
+              const score = qualityByAdvisor.get(row.advisor_key);
+              return (
               <tr key={`${row.org_id}-${row.advisor_key}`} className="border-t border-aryx-line">
                 <td className="py-3">{row.display_name || row.advisor_key.slice(0, 8)}</td>
                 <td>{compactNumber(row.active_members)}</td>
@@ -215,8 +290,11 @@ export function CosAdvisors() {
                 <td>{compactNumber(row.enrollments_90)}</td>
                 <td>{money(row.mrr_added_90)}</td>
                 <td>{row.margin_pct == null ? '—' : `${row.margin_pct}%`}</td>
+                <td>{score?.early == null ? '—' : `${score.early}%`}</td>
+                <td>{score?.contribution == null ? '—' : money(score.contribution)}</td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

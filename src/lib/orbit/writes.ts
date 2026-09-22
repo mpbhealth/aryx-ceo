@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { syncConnectors } from '@/lib/connectors';
 import { computeForecast, preferCompleteMonth } from '@/lib/forecast';
 import { ORBIT_OPERATOR_ONLY } from './character';
+import { observedMonthlyChurn } from '@/lib/ownerBrief';
 import { DEFAULT_FORECAST_ASSUMPTIONS, loadForecastBundle, type OrbitScope } from './snapshots';
 import type { OrbitWriteAction } from './intent';
 
@@ -19,14 +20,16 @@ export async function runOrbitWrite(action: OrbitWriteAction, scope: OrbitScope)
   if (!scope.orgId) return 'No active organization.';
   const bundle = await loadForecastBundle(scope);
   if (!bundle.pnl.length) return 'No forecast inputs in the warehouse.';
+  const churn = observedMonthlyChurn(bundle.enroll);
+  const assumptions = { ...DEFAULT_FORECAST_ASSUMPTIONS, monthlyChurn: churn.rate };
   const computed = computeForecast(
     { ...bundle, pnl: preferCompleteMonth(bundle.pnl) },
-    DEFAULT_FORECAST_ASSUMPTIONS,
+    assumptions,
   );
   const { error } = await supabase.from('forecast_runs').insert({
     org_id: scope.orgId,
-    horizon_days: DEFAULT_FORECAST_ASSUMPTIONS.horizonDays,
-    assumptions: DEFAULT_FORECAST_ASSUMPTIONS,
+    horizon_days: assumptions.horizonDays,
+    assumptions,
     outputs: computed,
     created_by: (await supabase.auth.getUser()).data.user?.id,
   });

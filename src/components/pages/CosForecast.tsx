@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { money, compactNumber } from '@/lib/cos';
@@ -7,10 +7,12 @@ import { OrgPicker } from '../cos/OrgPicker';
 import { Unlinked } from './CosFinance';
 import { CosPage, CosPageHero } from '../cos/CosPage';
 import { computeForecast, forecastSentence, HORIZON_PRESETS, preferCompleteMonth, priorForecastDelta, type ForecastAssumptions } from '@/lib/forecast';
+import { churnNote, observedMonthlyChurn } from '@/lib/ownerBrief';
 
 export function CosForecast() {
   const { orgId, linked, isOperator } = useOrg();
   const queryClient = useQueryClient();
+  const [churnEdited, setChurnEdited] = useState(false);
   const [assumptions, setAssumptions] = useState<ForecastAssumptions>({
     horizonDays: 90,
     weeklyWeeks: 8,
@@ -27,7 +29,7 @@ export function CosForecast() {
     queryFn: async () => {
       const [{ data: pnl }, { data: enroll }, { data: pipe }] = await Promise.all([
         supabase.from('fact_pnl_period').select('period_start, collected, vendor_cost, commissions, saas_cost, active_members').eq('org_id', orgId).eq('period_grain', 'month').order('period_start', { ascending: false }).limit(4),
-        supabase.from('fact_enrollments_daily').select('new_count, inactive_count, mrr, fact_date').eq('org_id', orgId).order('fact_date', { ascending: false }).limit(90),
+        supabase.from('fact_enrollments_daily').select('new_count, inactive_count, active_count, mrr, fact_date').eq('org_id', orgId).order('fact_date', { ascending: false }).limit(120),
         supabase.from('fact_crm_pipeline_daily').select('weighted_amount, premium_sum, fact_date').eq('org_id', orgId).order('fact_date', { ascending: false }).limit(30),
       ]);
       return { pnl: pnl || [], enroll: enroll || [], pipe: pipe || [] };
@@ -50,10 +52,18 @@ export function CosForecast() {
     },
   });
 
+  const churn = useMemo(() => observedMonthlyChurn(facts.data?.enroll || []), [facts.data]);
+
+  useEffect(() => {
+    if (!facts.data || churnEdited || churn.source !== 'observed') return;
+    setAssumptions((prev) => ({ ...prev, monthlyChurn: Number(churn.rate.toFixed(4)) }));
+  }, [churn.rate, churn.source, churnEdited, facts.data]);
+
   const computed = useMemo(() => {
     if (!facts.data) return null;
-    return computeForecast({ ...facts.data, pnl: preferCompleteMonth(facts.data.pnl) }, assumptions);
-  }, [facts.data, assumptions]);
+    const monthlyChurn = churnEdited || churn.source === 'default' ? assumptions.monthlyChurn : churn.rate;
+    return computeForecast({ ...facts.data, pnl: preferCompleteMonth(facts.data.pnl) }, { ...assumptions, monthlyChurn });
+  }, [assumptions, churn.rate, churn.source, churnEdited, facts.data]);
 
   const priorDelta = computed ? priorForecastDelta(computed, lastRun.data?.outputs as { pnl?: { base?: number } } | null) : null;
 
@@ -83,7 +93,7 @@ export function CosForecast() {
         title="Forecasts."
         lede={
           computed
-            ? forecastSentence(assumptions.horizonDays, computed.pnl, money)
+            ? `${forecastSentence(assumptions.horizonDays, computed.pnl, money)} ${churnEdited ? 'Monthly churn is the rate in the form.' : churnNote(churn)}`
             : 'Trailing run-rate × seasonality ± CRM weighted pipeline. Not a guarantee.'
         }
         toolbar={<OrgPicker />}
@@ -107,7 +117,7 @@ export function CosForecast() {
           <input type="number" step="0.05" className="mt-1 w-full rounded-xl border border-aryx-line bg-aryx-elevated px-3 py-2 text-aryx-ink" value={assumptions.seasonality} onChange={(e) => setAssumptions({ ...assumptions, seasonality: Number(e.target.value) })} />
         </label>
         <label className="text-xs text-aryx-muted">Monthly churn
-          <input type="number" step="0.01" className="mt-1 w-full rounded-xl border border-aryx-line bg-aryx-elevated px-3 py-2 text-aryx-ink" value={assumptions.monthlyChurn} onChange={(e) => setAssumptions({ ...assumptions, monthlyChurn: Number(e.target.value) })} />
+          <input type="number" step="0.01" className="mt-1 w-full rounded-xl border border-aryx-line bg-aryx-elevated px-3 py-2 text-aryx-ink" value={assumptions.monthlyChurn} onChange={(e) => { setChurnEdited(true); setAssumptions({ ...assumptions, monthlyChurn: Number(e.target.value) }); }} />
         </label>
         <label className="text-xs text-aryx-muted">Win rate
           <input type="number" step="0.01" className="mt-1 w-full rounded-xl border border-aryx-line bg-aryx-elevated px-3 py-2 text-aryx-ink" value={assumptions.winRate} onChange={(e) => setAssumptions({ ...assumptions, winRate: Number(e.target.value) })} />

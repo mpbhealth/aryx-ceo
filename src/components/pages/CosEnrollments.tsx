@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { compactNumber, money, periodBounds } from '@/lib/cos';
 import { formatFact } from '@/lib/marketingFacts';
 import { computeForecast, preferCompleteMonth } from '@/lib/forecast';
+import { observedMonthlyChurn } from '@/lib/ownerBrief';
 import { useOrg } from '@/contexts/OrgContext';
 import { useDeskPeriod } from '@/contexts/DeskPeriodContext';
 import { OrgPicker } from '../cos/OrgPicker';
@@ -87,7 +88,7 @@ export function CosEnrollments() {
     queryFn: async () => {
       const [{ data: pnl }, { data: enroll }, { data: pipe }] = await Promise.all([
         supabase.from('fact_pnl_period').select('period_start, collected, vendor_cost, commissions, saas_cost, active_members').in('org_id', orgIds).eq('period_grain', 'month').order('period_start', { ascending: false }).limit(4),
-        supabase.from('fact_enrollments_daily').select('new_count, inactive_count, mrr').in('org_id', orgIds).order('fact_date', { ascending: false }).limit(90),
+        supabase.from('fact_enrollments_daily').select('fact_date, new_count, inactive_count, active_count, mrr').in('org_id', orgIds).order('fact_date', { ascending: false }).limit(120),
         supabase.from('fact_crm_pipeline_daily').select('weighted_amount, premium_sum').in('org_id', orgIds).order('fact_date', { ascending: false }).limit(10),
       ]);
       return { pnl: pnl || [], enroll: enroll || [], pipe: pipe || [] };
@@ -133,18 +134,35 @@ export function CosEnrollments() {
     '90_plus': '90+ days',
   };
 
+  const quality = useQuery({
+    queryKey: ['book-quality-product', orgIds.join(',')],
+    enabled: orgIds.length > 0 && linked.enrollment,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fact_book_quality')
+        .select('quality_key, cohort_30, survived_30, cohort_60, survived_60, cohort_90, survived_90, first_pay_success_pct, contribution, metadata')
+        .in('org_id', orgIds)
+        .eq('grain', 'product')
+        .order('cohort_90', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const churn = useMemo(() => observedMonthlyChurn(forecastFacts.data?.enroll || []), [forecastFacts.data]);
+
   const projection = useMemo(() => {
     if (!forecastFacts.data) return null;
     return computeForecast({ ...forecastFacts.data, pnl: preferCompleteMonth(forecastFacts.data.pnl) }, {
       horizonDays: 90,
       weeklyWeeks: 8,
       seasonality: 1,
-      monthlyChurn: 0.03,
+      monthlyChurn: churn.rate,
       winRate: 0.25,
       pessimistic: 0.7,
       optimistic: 1.25,
     }).members;
-  }, [forecastFacts.data]);
+  }, [churn.rate, forecastFacts.data]);
 
   if (!linked.enrollment && !linked.advisoriq) {
     return <Unlinked title="Enrollments" message="EnrollFlow and AdvisorIQ are not linked for this organization." />;
@@ -220,6 +238,38 @@ export function CosEnrollments() {
       )}
       {linked.enrollment && (
         <>
+      {(quality.data || []).length > 0 && (
+        <div className="mt-10">
+          <h2 className="mb-3 text-sm uppercase tracking-[0.16em] text-aryx-faint">Still active</h2>
+          <p className="mb-3 text-xs text-aryx-faint">A plan counts only after it has been enrolled for that many days. First pay stays blank until billing can be joined. Contribution is MRR minus carrier cost, and minus commission only when the product is on the commission row.</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-[10px] uppercase tracking-[0.16em] text-aryx-faint">
+                <tr>
+                  <th className="py-2">Product</th>
+                  <th>30d</th>
+                  <th>60d</th>
+                  <th>90d</th>
+                  <th>First pay</th>
+                  <th>Contribution</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(quality.data || []).map((row) => (
+                  <tr key={row.quality_key} className="border-t border-aryx-line">
+                    <td className="py-3">{String(row.metadata?.product_label || row.quality_key)}</td>
+                    <td>{compactNumber(row.survived_30)}/{compactNumber(row.cohort_30)}</td>
+                    <td>{compactNumber(row.survived_60)}/{compactNumber(row.cohort_60)}</td>
+                    <td>{compactNumber(row.survived_90)}/{compactNumber(row.cohort_90)}</td>
+                    <td>{row.first_pay_success_pct == null ? '—' : `${row.first_pay_success_pct}%`}</td>
+                    <td>{row.contribution == null ? '—' : money(Number(row.contribution))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       <h2 className="mb-3 mt-10 text-sm uppercase tracking-[0.16em] text-aryx-faint">Product / plan mix</h2>
       <div className="space-y-2">
         {mix.map(([label, row]) => (
