@@ -21,19 +21,19 @@ export function SourceHealth() {
   if (!orgId) return null;
 
   return (
-    <div className="mb-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:mb-6 sm:p-6">
+    <div className="mb-4 rounded-2xl border border-aryx-line bg-aryx-elevated p-4 shadow-sm sm:mb-6 sm:p-6">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-gray-900">Source health</h2>
-        <Link to="/operations/integrations" className="text-sm text-sky-700">Manage maps</Link>
+        <h2 className="text-base font-semibold text-aryx-ink">Source health</h2>
+        <Link to="/operations/integrations" className="text-sm text-aryx-accent">Manage maps</Link>
       </div>
       <div className="flex flex-wrap gap-2">
         {(sources.data || []).map((row) => (
-          <span key={row.key} className="rounded-full border border-gray-200 px-3 py-1 text-[10px] uppercase tracking-wider text-gray-500">
+          <span key={row.key} className="rounded-full border border-aryx-line px-3 py-1 text-[10px] uppercase tracking-wider text-aryx-faint">
             {row.key} · {row.status}
           </span>
         ))}
         {(sources.data || []).length === 0 && (
-          <p className="text-sm text-gray-500">No sources yet for this organization.</p>
+          <p className="text-sm text-aryx-muted">No sources yet for this organization.</p>
         )}
       </div>
     </div>

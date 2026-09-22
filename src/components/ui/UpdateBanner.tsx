@@ -12,7 +12,7 @@ export function UpdateBanner() {
           initial={{ opacity: 0, y: -40 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -40 }}
-          className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-center px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-sm shadow-lg"
+          className="fixed top-0 left-0 right-0 z-[60] flex items-center justify-center bg-aryx-accent px-4 py-2 text-sm text-white shadow-lg"
         >
           <div className="flex items-center gap-3 max-w-xl">
             <RefreshCw className="w-4 h-4 flex-shrink-0 animate-spin-slow" />

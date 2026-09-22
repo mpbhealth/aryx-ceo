@@ -9,7 +9,7 @@ import { AuthShell } from '../brand/AuthShell';
 type LoginMode = 'signin' | 'signup' | 'forgot';
 
 const fieldClass =
-  'w-full rounded-full border border-aryx-line bg-aryx-bg py-3 pl-11 pr-4 text-aryx-ink outline-none placeholder:text-aryx-faint';
+  'w-full rounded-full border border-aryx-line bg-aryx-ink/[0.06] py-3 pl-11 pr-4 text-aryx-ink outline-none placeholder:text-aryx-faint';
 
 export default function Login({ onLoginSuccess }: { onLoginSuccess?: () => void } = {}) {
   const navigate = useNavigate();
@@ -108,7 +108,7 @@ export default function Login({ onLoginSuccess }: { onLoginSuccess?: () => void 
   return (
     <AuthShell>
       <div className="rounded-[2rem] bg-aryx-ink/5 p-1.5 ring-1 ring-aryx-line">
-        <div className="rounded-[calc(2rem-0.375rem)] bg-aryx-elevated p-8 shadow-[inset_0_1px_1px_rgba(255,255,255,0.35)]">
+        <div className="rounded-[calc(2rem-0.375rem)] bg-aryx-elevated p-8 shadow-[inset_0_1px_1px_rgba(255,255,255,0.35)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)]">
           <h1 className="font-display text-3xl font-semibold text-aryx-ink">{title}</h1>
           <p className="mt-2 text-sm text-aryx-muted">{subtitle}</p>
 

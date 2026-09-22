@@ -238,7 +238,7 @@ export default function Settings() {
             <button
               type="submit"
               disabled={isDemoMode || savingName || !name.trim()}
-              className="rounded-xl bg-gray-900 px-4 py-2 text-sm text-white disabled:opacity-50"
+              className="rounded-xl bg-aryx-accent px-4 py-2 text-sm text-white disabled:opacity-50"
             >
               {savingName ? 'Saving…' : 'Save name'}
             </button>
@@ -285,7 +285,7 @@ export default function Settings() {
               type="button"
               disabled={isDemoMode}
               onClick={() => setMfaOpen(true)}
-              className="rounded-xl bg-gray-900 px-4 py-2 text-sm text-white disabled:opacity-50"
+              className="rounded-xl bg-aryx-accent px-4 py-2 text-sm text-white disabled:opacity-50"
             >
               Set up authenticator
             </button>
@@ -510,11 +510,10 @@ export default function Settings() {
               disabled={isDemoMode || isLoading || !currentPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword}
               className="
                 w-full py-4 px-4 
-                bg-gradient-to-r from-sky-500 to-blue-600 
+                bg-aryx-accent
                 text-white font-semibold rounded-xl 
                 shadow-lg hover:shadow-xl 
-                hover:from-sky-600 hover:to-blue-700 
-                focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 
+                focus:ring-2 focus:ring-aryx-accent focus:ring-offset-2 
                 transition-all duration-200
                 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg
                 active:scale-[0.98]

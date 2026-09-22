@@ -52,9 +52,9 @@ const priorityStyles: Record<NotificationPriority, { bg: string; border: string;
     icon: 'text-orange-600',
   },
   info: {
-    bg: 'bg-white',
-    border: 'border-l-blue-400',
-    icon: 'text-blue-600',
+    bg: 'bg-aryx-elevated',
+    border: 'border-l-aryx-accent',
+    icon: 'text-aryx-accent',
   },
 };
 
@@ -114,9 +114,9 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
   };
 
   return (
-    <div className="w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+    <div className="aryx-surface w-80 overflow-hidden rounded-xl border border-aryx-line bg-aryx-elevated text-aryx-ink shadow-2xl sm:w-96">
       {/* Header */}
-      <div className="px-4 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white">
+      <div className="bg-aryx-void px-4 py-3 text-[#F4F1EA]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Bell className="w-5 h-5" />
@@ -145,7 +145,7 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
               className={`
                 px-3 py-1 rounded-lg text-xs font-medium transition-colors capitalize
                 ${filter === option
-                  ? 'bg-white text-indigo-600'
+                  ? 'bg-aryx-accent text-white'
                   : 'bg-white/10 text-white/80 hover:bg-white/20'
                 }
               `}

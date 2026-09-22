@@ -13,7 +13,7 @@ export function applyTheme(mode: ThemeMode) {
   if (typeof document === 'undefined') return;
   document.documentElement.classList.toggle('dark', mode === 'dark');
   document.documentElement.style.colorScheme = mode;
-  const themeColor = mode === 'dark' ? '#0B0B0D' : '#FF5A1F';
+  const themeColor = mode === 'dark' ? '#0C0B0A' : '#F3EFE6';
   document.querySelectorAll('meta[name="theme-color"]').forEach((node) => {
     node.setAttribute('content', themeColor);
   });
