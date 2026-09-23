@@ -1,0 +1,48 @@
+name: CI
+
+# Why this exists: the Vercel GitHub integration builds every `main` commit at
+# target=production. Before this workflow there was no CI at all, and `vite build`
+# does not typecheck — so a commit with type errors deployed to ceo.aryx.pro with a
+# green checkmark. This runs the checks the build skips.
+#
+# This workflow only reports. To make it *block*, the checks must be required on
+# `main` in branch protection — see docs/CI.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: tests · build · ratchet
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Fast and fully green today (92 tests). Any failure here is a real regression.
+      - name: Tests
+        run: npx vitest run
+
+      # Must stay green: this is what Vercel runs to produce the deployed bundle.
+      - name: Build
+        run: npx vite build
+
+      # Type and lint errors may not increase. See quality-baseline.json.
+      - name: Quality ratchet
+        run: node scripts/quality-ratchet.mjs

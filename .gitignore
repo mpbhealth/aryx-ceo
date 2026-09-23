@@ -30,3 +30,6 @@ out/
 
 .vercel
 .env*.local
+
+# TypeScript incremental build state — machine-local, shows up dirty on every build
+*.tsbuildinfo
