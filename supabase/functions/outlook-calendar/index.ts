@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { requireCaller } from '../_shared/caller.ts';
 
 interface OutlookConfig {
   id: string;
@@ -309,6 +310,28 @@ Deno.serve(async (req: Request) => {
     return new Response('ok', { 
       status: 200,
       headers: corsHeaders 
+    });
+  }
+
+  // Identity check. `verify_jwt = true` only proves the bearer is *a* valid Supabase
+  // JWT, and the public anon key shipped in the browser bundle satisfies it — so the
+  // platform gate is not an identity gate. Without this block any visitor could drive
+  // the service-role path below against the connected mailbox (read, create, update
+  // and delete events). Confirmed 2026-09-23: this function returned 200 to an
+  // anon-key caller while every sibling function returned 401.
+  let caller: { userId: string | null; service: boolean };
+  try {
+    caller = await requireCaller(req);
+  } catch {
+    return new Response(JSON.stringify({ error: 'Not authenticated' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+  if (!caller.userId && !caller.service) {
+    return new Response(JSON.stringify({ error: 'Not authenticated' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 

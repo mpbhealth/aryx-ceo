@@ -1,6 +1,27 @@
 import { useState, useEffect, useCallback } from 'react';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+
+/**
+ * Headers for the outlook-calendar Edge Function.
+ *
+ * These call sites previously sent VITE_SUPABASE_ANON_KEY as the bearer. That key is
+ * public — it ships in the browser bundle — so it identified nobody, and the function
+ * ran the service-role mailbox path for any caller. The bearer must be the signed-in
+ * user's session token; `apikey` still carries the anon key, which is what Supabase
+ * expects for project routing.
+ */
+async function outlookAuthHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error('Not authenticated');
+  }
+  return {
+    'Content-Type': 'application/json',
+    apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${session.access_token}`,
+  };
+}
 
 export interface CalendarEvent {
   id: string;
@@ -109,10 +130,7 @@ export function useOutlookCalendar(options: UseOutlookCalendarOptions = {}) {
       
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
+        headers: await outlookAuthHeaders(),
         body: JSON.stringify({
           action: 'getEvents',
           startDate: dateRange.startDate.toISOString(),
@@ -163,10 +181,7 @@ export function useOutlookCalendar(options: UseOutlookCalendarOptions = {}) {
       
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
+        headers: await outlookAuthHeaders(),
         body: JSON.stringify({
           action: 'createEvent',
           event: eventData,
@@ -202,10 +217,7 @@ export function useOutlookCalendar(options: UseOutlookCalendarOptions = {}) {
       
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
+        headers: await outlookAuthHeaders(),
         body: JSON.stringify({
           action: 'deleteEvent',
           eventId,
@@ -234,10 +246,7 @@ export function useOutlookCalendar(options: UseOutlookCalendarOptions = {}) {
       
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
+        headers: await outlookAuthHeaders(),
         body: JSON.stringify({
           action: 'updateEvent',
           eventId,
