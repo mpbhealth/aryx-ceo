@@ -74,8 +74,6 @@ export const cosNavigationItems: NavItem[] = [
       { id: 'dev-overview', label: 'Overview', path: '/development' },
       { id: 'tech-stack', label: 'Tech Stack', path: '/development/tech-stack' },
       { id: 'quicklinks', label: 'Quick Links', path: '/development/quicklinks' },
-      { id: 'roadmap', label: 'Roadmap', path: '/development/roadmap' },
-      { id: 'roadmap-visualizer', label: 'Visualizer', path: '/development/roadmap-visualizer' },
       { id: 'projects', label: 'Projects', path: '/development/projects' },
       { id: 'assignments', label: 'Assignments', path: '/development/assignments' },
       { id: 'notepad', label: 'Notepad', path: '/development/notepad' },

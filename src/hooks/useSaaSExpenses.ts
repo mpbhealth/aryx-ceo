@@ -1,25 +1,28 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { Tables } from '../types/database';
 import { supabase } from '../lib/supabase';
 import { useOrg } from '../contexts/OrgContext';
 
-export interface SaaSExpenseRow {
-  id: string;
-  name?: string;
-  application?: string;
-  department?: string;
-  owner?: string;
-  amount?: number;
-  cadence?: string;
-  cost_monthly: number;
-  cost_annual: number;
-  description?: string;
-  platform?: string;
-  url?: string;
-  renewal_date?: string;
-  notes?: string;
-  created_at?: string;
-  updated_at?: string;
-}
+/**
+ * The row shape comes from the generated schema, not from a hand-written copy.
+ *
+ * There were three competing definitions of this one table: this interface, a
+ * `SaaSExpense` in types/common.ts, and the generated `saas_expenses`. Each modelled a
+ * different subset with different names, which is why the page referenced department,
+ * application, cost_monthly, platform and url as properties that did not exist on the
+ * type it was given. Deriving from the schema keeps one truth and survives a regenerate.
+ *
+ * Note the table itself has drifted — it carries both `cost_monthly` and `monthly_cost`,
+ * and both `application` and `service_name`. That is a schema cleanup, not a types fix.
+ */
+export type SaaSExpenseRow = Tables<'saas_expenses'>;
+
+/**
+ * What a caller may write. Callers pass an interface (a page's form state), and an
+ * interface is not assignable to Record<string, unknown> — interfaces get no implicit
+ * index signature — so the write helpers took a shape no form could satisfy.
+ */
+export type SaaSExpenseInput = Partial<Omit<SaaSExpenseRow, 'id' | 'created_at' | 'updated_at'>>;
 
 interface SaaSMetrics {
   totalMonthly: number;
@@ -113,7 +116,7 @@ export function useSaaSExpenses() {
     fetchData();
   }, [fetchData]);
 
-  const addExpense = async (expense: Record<string, unknown>) => {
+  const addExpense = async (expense: SaaSExpenseInput) => {
     try {
       if (!orgId) throw new Error('No active organization');
       const monthly = Number(expense.cost_monthly || expense.amount || 0);
@@ -134,7 +137,7 @@ export function useSaaSExpenses() {
     }
   };
 
-  const updateExpense = async (id: string, updates: Record<string, unknown>) => {
+  const updateExpense = async (id: string, updates: SaaSExpenseInput) => {
     try {
       const payload: Record<string, unknown> = {};
       if (updates.application || updates.name) payload.name = updates.application || updates.name;
@@ -162,7 +165,7 @@ export function useSaaSExpenses() {
     }
   };
 
-  const bulkImport = async (expenses: Record<string, unknown>[]) => {
+  const bulkImport = async (expenses: SaaSExpenseInput[]) => {
     for (const expense of expenses) {
       const result = await addExpense(expense);
       if (!result.success) return result;

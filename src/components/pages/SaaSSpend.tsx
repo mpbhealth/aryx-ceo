@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent, ChangeEvent } from 'react';
 import { useSaaSExpenses } from '../../hooks/useSaaSExpenses';
-import { SaaSExpense } from '../../types/common';
+import type { SaaSExpenseRow } from '../../hooks/useSaaSExpenses';
 import SaaSExpenseUploader from '../ui/SaaSExpenseUploader';
 import { CreditCard, TrendingUp, Calendar, DollarSign, Edit, Trash2, Plus } from 'lucide-react';
 import ExportDropdown from '../ui/ExportDropdown';
@@ -27,7 +27,7 @@ export default function SaaSSpend() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedExpense, setSelectedExpense] = useState<SaaSExpense | null>(null);
+  const [selectedExpense, setSelectedExpense] = useState<SaaSExpenseRow | null>(null);
   const [formData, setFormData] = useState<SaaSExpenseFormData>({
     department: '',
     application: '',
@@ -75,7 +75,7 @@ export default function SaaSSpend() {
     return { status: 'ok', color: 'bg-emerald-100 text-emerald-800' };
   };
 
-  const handleEditExpense = (expense: SaaSExpense) => {
+  const handleEditExpense = (expense: SaaSExpenseRow) => {
     setSelectedExpense(expense);
     setFormData({
       department: expense.department,
@@ -91,7 +91,7 @@ export default function SaaSSpend() {
     setIsEditModalOpen(true);
   };
 
-  const handleDeleteExpense = async (expense: SaaSExpense) => {
+  const handleDeleteExpense = async (expense: SaaSExpenseRow) => {
     if (window.confirm(`Are you sure you want to delete "${expense.application}"? This action cannot be undone.`)) {
       setDeletingId(expense.id);
       try {

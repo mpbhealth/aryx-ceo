@@ -118,7 +118,6 @@ export function CosDevelopment() {
       </div>
 
       <div className="mt-8 flex flex-wrap gap-3 text-sm">
-        <Link to="/development/roadmap" className="rounded-full border border-aryx-line px-4 py-2">Roadmap</Link>
         <Link to="/development/tech-stack" className="rounded-full border border-aryx-line px-4 py-2">Tech stack</Link>
         <Link to="/files" className="rounded-full border border-aryx-line px-4 py-2">Files</Link>
         <Link to="/operations/organization" className="rounded-full border border-aryx-line px-4 py-2">Organization</Link>
