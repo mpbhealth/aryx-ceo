@@ -17,25 +17,6 @@ export default function Projects() {
   const [selectedProjectForEdit, setSelectedProjectForEdit] = useState<Project | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">Error loading data: {error}</p>
-          <p className="text-slate-600">Please make sure you're connected to Supabase.</p>
-        </div>
-      </div>
-    );
-  }
-
   const exportData = useMemo(() => ({
     title: 'MPB Health Active Projects',
     data: projects.map(project => ({
@@ -61,6 +42,25 @@ export default function Projects() {
   const uniqueTeamMembers = useMemo(() => {
     return Array.from(new Set(projects.flatMap(p => p.team))).length;
   }, [projects]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Error loading data: {error}</p>
+          <p className="text-slate-600">Please make sure you're connected to Supabase.</p>
+        </div>
+      </div>
+    );
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {

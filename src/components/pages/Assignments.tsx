@@ -74,6 +74,24 @@ export default function Assignments() {
     return result.data;
   };
 
+  const filteredAssignments = useMemo(() => assignments.filter(assignment => {
+    const matchesSearch = searchTerm === '' ||
+      assignment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      assignment.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesProject = selectedProject === 'All' || assignment.project_id === selectedProject;
+    const matchesStatus = selectedStatus === 'All' || assignment.status === selectedStatus;
+    const matchesAssignee = selectedAssignee === 'All' || assignment.assigned_to === selectedAssignee;
+
+    return matchesSearch && matchesProject && matchesStatus && matchesAssignee;
+  }), [assignments, searchTerm, selectedProject, selectedStatus, selectedAssignee]);
+
+  const groupedAssignments = useMemo(() => ({
+    todo: filteredAssignments.filter(a => a.status === 'todo' || a.status === 'pending'),
+    in_progress: filteredAssignments.filter(a => a.status === 'in_progress'),
+    done: filteredAssignments.filter(a => a.status === 'done' || a.status === 'completed')
+  }), [filteredAssignments]);
+
   const handleCopyAssignment = async (assignment: AssignmentWithDetails) => {
     const result = await copyAssignmentToClipboard({
       title: assignment.title,
@@ -118,19 +136,6 @@ export default function Assignments() {
       </div>
     );
   }
-
-  // Filter assignments
-  const filteredAssignments = useMemo(() => assignments.filter(assignment => {
-    const matchesSearch = searchTerm === '' ||
-      assignment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      assignment.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesProject = selectedProject === 'All' || assignment.project_id === selectedProject;
-    const matchesStatus = selectedStatus === 'All' || assignment.status === selectedStatus;
-    const matchesAssignee = selectedAssignee === 'All' || assignment.assigned_to === selectedAssignee;
-    
-    return matchesSearch && matchesProject && matchesStatus && matchesAssignee;
-  }), [assignments, searchTerm, selectedProject, selectedStatus, selectedAssignee]);
 
   const statuses = ['All', 'pending', 'in_progress', 'completed'];
 
@@ -252,13 +257,6 @@ export default function Assignments() {
     setSelectedAssignee('All');
     setSearchTerm('');
   };
-
-  // Group assignments by status for kanban view
-  const groupedAssignments = useMemo(() => ({
-    todo: filteredAssignments.filter(a => a.status === 'todo' || a.status === 'pending'),
-    in_progress: filteredAssignments.filter(a => a.status === 'in_progress'),
-    done: filteredAssignments.filter(a => a.status === 'done' || a.status === 'completed')
-  }), [filteredAssignments]);
 
   const renderKanbanColumn = (status: string, title: string, assignments: AssignmentWithDetails[]) => (
     <div className="bg-slate-50 p-4 rounded-xl min-h-96">
