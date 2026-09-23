@@ -42,20 +42,25 @@ function countTypeErrors() {
 function countLintErrors() {
   const out = run('npx eslint . -f json');
   const start = out.indexOf('[');
-  if (start === -1) return { errors: 0, warnings: 0 };
+  if (start === -1) return { errors: 0, warnings: 0, files: [] };
   try {
     const report = JSON.parse(out.slice(start));
     return {
       errors: report.reduce((n, f) => n + f.errorCount, 0),
       warnings: report.reduce((n, f) => n + f.warningCount, 0),
+      files: report
+        .filter((f) => f.errorCount > 0)
+        .map((f) => ({ path: f.filePath.replace(`${root}/`, ''), count: f.errorCount }))
+        .sort((a, b) => b.count - a.count),
     };
   } catch {
-    return { errors: 0, warnings: 0 };
+    return { errors: 0, warnings: 0, files: [] };
   }
 }
 
 const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
-const actual = { typeErrors: countTypeErrors(), ...countLintErrors() };
+const { files: lintFiles, ...lintCounts } = countLintErrors();
+const actual = { typeErrors: countTypeErrors(), ...lintCounts };
 
 const checks = [
   ['type errors', actual.typeErrors, baseline.typeErrors],
@@ -93,6 +98,10 @@ if (process.argv.includes('--update')) {
 }
 
 if (failed) {
+  if (lintFiles.length) {
+    console.log('\nLint errors by file:');
+    for (const f of lintFiles) console.log(`    ${String(f.count).padStart(3)}  ${f.path}`);
+  }
   console.log('\nThis change adds problems that did not exist before. Fix them, or');
   console.log('explain in the PR why the baseline should move.\n');
   process.exit(1);
