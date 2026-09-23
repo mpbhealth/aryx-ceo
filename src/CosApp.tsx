@@ -38,8 +38,6 @@ const OAuthCallback = lazy(() => import('./components/pages/OAuthCallback').then
 const DevelopmentOverview = lazy(() => import('./components/pages/CosDevelopment'));
 const TechStack = lazy(() => import('./components/pages/TechStack'));
 const QuickLinks = lazy(() => import('./components/pages/QuickLinks'));
-const Roadmap = lazy(() => import('./components/pages/Roadmap'));
-const RoadVisualizer = lazy(() => import('./components/pages/RoadVisualizerWithFilters'));
 const Projects = lazy(() => import('./components/pages/Projects'));
 const Assignments = lazy(() => import('./components/pages/Assignments'));
 const Notepad = lazy(() => import('./components/pages/Notepad'));
@@ -192,8 +190,6 @@ function CosContent() {
             <Route path="/development" element={<DevelopmentOverview />} />
             <Route path="/development/tech-stack" element={<TechStack />} />
             <Route path="/development/quicklinks" element={<QuickLinks />} />
-            <Route path="/development/roadmap" element={<Roadmap />} />
-            <Route path="/development/roadmap-visualizer" element={<RoadVisualizer />} />
             <Route path="/development/projects" element={<Projects />} />
             <Route path="/development/assignments" element={<Assignments />} />
             <Route path="/development/notepad" element={<Notepad />} />

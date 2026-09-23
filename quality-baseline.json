@@ -1,6 +1,7 @@
 {
   "_comment": "Ceiling for scripts/quality-ratchet.mjs. These numbers may only go DOWN. Lower them with `node scripts/quality-ratchet.mjs --update` in the same commit that fixes the errors. Raising a number needs a reason in the PR.",
-  "typeErrors": 166,
+  "_raised_2026_09_23": "typeErrors went 166 -> 215 deliberately. The old figure was measured against src/types/database.ts, which described the pre-COS schema rather than this database: projects.github_link, projects.team, roadmap_items.quarter and others do not exist, proven by 400s from PostgREST. Replacing it with the regenerated schema exposed errors that were always there and simply could not be seen. The number went up because the measurement got honest.",
+  "typeErrors": 215,
   "errors": 19,
   "warnings": 22,
   "updated": "2026-09-23"

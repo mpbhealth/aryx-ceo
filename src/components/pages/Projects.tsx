@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useProjects } from '../../hooks/useSupabaseData';
-import { FolderOpen, Github, ExternalLink, Users, BarChart3, Plus, Edit, Trash2, Globe } from 'lucide-react';
+import { FolderOpen, Users, BarChart3, Plus, Edit, Trash2 } from 'lucide-react';
 import AddProjectModal from '../modals/AddProjectModal';
 import EditProjectModal from '../modals/EditProjectModal';
 import ExportDropdown from '../ui/ExportDropdown';
@@ -23,24 +23,21 @@ export default function Projects() {
       Name: project.name,
       Description: project.description,
       Status: project.status,
-      Progress: `${project.progress}%`,
-      Team: project.team.join(', '),
-      'GitHub Link': project.github_link || 'N/A',
-      'Monday Link': project.monday_link || 'N/A',
-      'Website URL': project.website_url || 'N/A',
+      Progress: `${project.progress ?? 0}%`,
+      Team: (project.team_members ?? []).join(', '),
       'Created Date': new Date(project.created_at).toLocaleDateString(),
       'Updated Date': new Date(project.updated_at).toLocaleDateString()
     })),
-    headers: ['Name', 'Description', 'Status', 'Progress', 'Team', 'GitHub Link', 'Website URL'],
+    headers: ['Name', 'Description', 'Status', 'Progress', 'Team'],
     filename: 'MPB_Health_Active_Projects'
   }), [projects]);
 
   const avgProgress = useMemo(() => {
-    return projects.length > 0 ? Math.round(projects.reduce((acc, p) => acc + p.progress, 0) / projects.length) : 0;
+    return projects.length > 0 ? Math.round(projects.reduce((acc, p) => acc + (p.progress ?? 0), 0) / projects.length) : 0;
   }, [projects]);
 
   const uniqueTeamMembers = useMemo(() => {
-    return Array.from(new Set(projects.flatMap(p => p.team))).length;
+    return Array.from(new Set(projects.flatMap(p => p.team_members ?? []))).length;
   }, [projects]);
 
   if (loading) {
@@ -233,8 +230,8 @@ export default function Projects() {
               </div>
               <div className="w-full bg-slate-200 rounded-full h-2">
                 <div 
-                  className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(project.progress)}`}
-                  style={{ width: `${project.progress}%` }}
+                  className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(project.progress ?? 0)}`}
+                  style={{ width: `${project.progress ?? 0}%` }}
                 ></div>
               </div>
             </div>
@@ -254,7 +251,7 @@ export default function Projects() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">Team Size:</span>
-                    <span className="text-slate-900">{project.team.length} members</span>
+                    <span className="text-slate-900">{(project.team_members ?? []).length} members</span>
                   </div>
                 </div>
                 <div className="mt-3 pt-3 border-t border-slate-200">
@@ -288,7 +285,7 @@ export default function Projects() {
             <div className="mb-4">
               <p className="text-sm font-medium text-slate-700 mb-2">Team Members</p>
               <div className="flex flex-wrap gap-2">
-                {project.team.map((member, index) => (
+                {(project.team_members ?? []).map((member: string, index: number) => (
                   <span key={index} className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-sm">
                     {member}
                   </span>
@@ -296,42 +293,6 @@ export default function Projects() {
               </div>
             </div>
 
-            {/* Links */}
-            <div className="flex items-center space-x-2 sm:space-x-4 pt-4 border-t border-slate-200">
-              {project.github_link && (
-                <a 
-                  href={project.github_link}
-                  className="flex items-center space-x-1 text-slate-600 hover:text-indigo-600 transition-colors"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Github className="w-4 h-4" />
-                  <span className="text-sm">GitHub</span>
-                </a>
-              )}
-              {project.monday_link && (
-                <a 
-                  href={project.monday_link}
-                  className="flex items-center space-x-1 text-slate-600 hover:text-indigo-600 transition-colors"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  <span className="text-sm">Monday.com</span>
-                </a>
-              )}
-              {project.website_url && (
-                <a 
-                  href={project.website_url}
-                  className="flex items-center space-x-1 text-slate-600 hover:text-emerald-600 transition-colors"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Globe className="w-4 h-4" />
-                  <span className="text-sm">Website</span>
-                </a>
-              )}
-            </div>
           </div>
         ))}
       </div>
