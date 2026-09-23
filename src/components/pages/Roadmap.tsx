@@ -6,8 +6,9 @@ import { Calendar, User, AlertCircle, CheckCircle, Clock, Plus, Edit, Trash2, Re
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../types/database';
 
+import { canonicalPriority, canonicalStatus } from '../../lib/roadmapFacets';
+
 type RoadmapItem = Database['public']['Tables']['roadmap_items']['Row'];
-type _Project = Database['public']['Tables']['projects']['Row'];
 
 interface RoadmapFormData {
   title: string;
@@ -19,6 +20,8 @@ interface RoadmapFormData {
   dependencies: string;
   description: string;
 }
+
+
 
 export default function Roadmap() {
   const { data: roadmapItems, loading: roadmapLoading, error: roadmapError, refetch: refetchRoadmap } = useRoadmapItems();
@@ -240,13 +243,15 @@ export default function Roadmap() {
     setSelectedItem(item);
     setFormData({
       title: item.title,
-      quarter: item.quarter,
-      status: item.status,
-      priority: item.priority,
-      owner: item.owner,
-      department: item.department,
+      // The column is nullable; a form input must be given a string or React
+      // switches it from controlled to uncontrolled mid-edit.
+      quarter: item.quarter ?? '',
+      status: canonicalStatus(item.status),
+      priority: canonicalPriority(item.priority),
+      owner: item.owner ?? '',
+      department: item.department ?? '',
       dependencies: item.dependencies.join(', '),
-      description: item.description
+      description: item.description ?? ''
     });
     setIsEditModalOpen(true);
   };

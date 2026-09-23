@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRoadmapItems } from '../../hooks/useSupabaseData';
+import { canonicalPriority, canonicalStatus, type RoadmapPriority } from '../../lib/roadmapFacets';
+import type { Database } from '../../types/database';
 import { 
   Calendar, 
   User, 
@@ -16,6 +18,8 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
+
+type RoadmapItem = Database['public']['Tables']['roadmap_items']['Row'];
 
 const priorityColors = {
   High: 'bg-red-500',
@@ -68,18 +72,20 @@ export default function RoadVisualizerWithFilters() {
   }
 
   // Get unique values for filter options
-  const quarters = ['All', ...Array.from(new Set(roadmapItems.map(item => item.quarter))).sort()];
-  const departments = ['All', ...Array.from(new Set(roadmapItems.map(item => item.department)))];
+  // quarter, department and owner are all nullable columns; a null would otherwise
+  // reach <option value> and React would render it as the string "null".
+  const quarters = ['All', ...Array.from(new Set(roadmapItems.map(item => item.quarter).filter(Boolean) as string[])).sort()];
+  const departments = ['All', ...Array.from(new Set(roadmapItems.map(item => item.department).filter(Boolean) as string[]))];
   const statuses = ['All', 'Backlog', 'In Progress', 'Complete'];
   const priorities = ['All', 'High', 'Medium', 'Low'];
-  const owners = ['All', ...Array.from(new Set(roadmapItems.map(item => item.owner)))];
+  const owners = ['All', ...Array.from(new Set(roadmapItems.map(item => item.owner).filter(Boolean) as string[]))];
 
   // Apply all filters
-  const applyFilters = (item) => {
+  const applyFilters = (item: RoadmapItem) => {
     const matchesSearch = searchTerm === '' || 
       item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.owner.toLowerCase().includes(searchTerm.toLowerCase());
+      (item.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.owner || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesDepartment = filters.department === 'All' || item.department === filters.department;
     const matchesStatus = filters.status === 'All' || item.status === filters.status;
@@ -107,8 +113,8 @@ export default function RoadVisualizerWithFilters() {
     return Object.values(filters).filter(value => value !== 'All').length + (searchTerm ? 1 : 0);
   };
 
-  const getStatusIcon = (status) => {
-    const Icon = statusIcons[status] || AlertCircle;
+  const getStatusIcon = (status: RoadmapItem['status']) => {
+    const Icon = statusIcons[canonicalStatus(status)] || AlertCircle;
     return <Icon className="w-4 h-4" />;
   };
 
@@ -405,8 +411,8 @@ export default function RoadVisualizerWithFilters() {
                             className={`
                               p-4 rounded-xl shadow-sm border-2 text-white cursor-pointer
                               hover:shadow-md transition-all duration-200
-                              ${priorityColors[item.priority]} 
-                              ${statusStyles[item.status]}
+                              ${priorityColors[canonicalPriority(item.priority)]} 
+                              ${statusStyles[canonicalStatus(item.status)]}
                             `}
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -470,8 +476,8 @@ export default function RoadVisualizerWithFilters() {
                             key={item.id}
                             className={`
                               p-4 rounded-lg shadow-sm border text-white
-                              ${priorityColors[item.priority]} 
-                              ${statusStyles[item.status]}
+                              ${priorityColors[canonicalPriority(item.priority)]} 
+                              ${statusStyles[canonicalStatus(item.status)]}
                             `}
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
@@ -498,7 +504,7 @@ export default function RoadVisualizerWithFilters() {
                   return (
                     <div key={status} className="space-y-4">
                       <div className="flex items-center space-x-2 pb-4 border-b border-slate-200">
-                        {getStatusIcon(status)}
+                        {getStatusIcon(status as RoadmapItem['status'])}
                         <h2 className="text-lg font-semibold text-slate-900">{status}</h2>
                         <span className="text-sm text-slate-600">({statusItems.length})</span>
                       </div>
@@ -508,7 +514,7 @@ export default function RoadVisualizerWithFilters() {
                             key={item.id}
                             className={`
                               p-4 rounded-lg shadow-sm border text-white
-                              ${priorityColors[item.priority]}
+                              ${priorityColors[canonicalPriority(item.priority)]}
                             `}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
@@ -533,7 +539,7 @@ export default function RoadVisualizerWithFilters() {
                   return (
                     <div key={priority} className="space-y-4">
                       <div className="flex items-center space-x-2 pb-4 border-b border-slate-200">
-                        <div className={`w-4 h-4 rounded-full ${priorityColors[priority]}`}></div>
+                        <div className={`w-4 h-4 rounded-full ${priorityColors[priority as RoadmapPriority]}`}></div>
                         <h2 className="text-lg font-semibold text-slate-900">{priority} Priority</h2>
                         <span className="text-sm text-slate-600">({priorityItems.length})</span>
                       </div>
@@ -543,8 +549,8 @@ export default function RoadVisualizerWithFilters() {
                             key={item.id}
                             className={`
                               p-4 rounded-lg shadow-sm border text-white
-                              ${priorityColors[item.priority]}
-                              ${statusStyles[item.status]}
+                              ${priorityColors[canonicalPriority(item.priority)]}
+                              ${statusStyles[canonicalStatus(item.status)]}
                             `}
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}

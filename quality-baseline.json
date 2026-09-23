@@ -1,6 +1,6 @@
 {
   "_comment": "Ceiling for scripts/quality-ratchet.mjs. These numbers may only go DOWN. Lower them with `node scripts/quality-ratchet.mjs --update` in the same commit that fixes the errors. Raising a number needs a reason in the PR.",
-  "typeErrors": 187,
+  "typeErrors": 166,
   "errors": 19,
   "warnings": 22,
   "updated": "2026-09-23"
