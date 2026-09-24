@@ -15,18 +15,6 @@ export interface Assignment extends BaseEntity {
   tags?: string[];
 }
 
-export interface SaaSExpense extends BaseEntity {
-  service_name: string;
-  category: string;
-  monthly_cost: number;
-  annual_cost: number;
-  billing_cycle: 'monthly' | 'annual' | 'quarterly';
-  renewal_date?: string;
-  owner?: string;
-  status: 'active' | 'inactive' | 'trial';
-  notes?: string;
-}
-
 export interface PolicyDocument extends BaseEntity {
   title: string;
   description?: string;

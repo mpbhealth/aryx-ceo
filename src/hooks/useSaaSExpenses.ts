@@ -4,71 +4,74 @@ import { supabase } from '../lib/supabase';
 import { useOrg } from '../contexts/OrgContext';
 
 /**
- * The row shape comes from the generated schema, not from a hand-written copy.
- *
- * There were three competing definitions of this one table: this interface, a
- * `SaaSExpense` in types/common.ts, and the generated `saas_expenses`. Each modelled a
- * different subset with different names, which is why the page referenced department,
- * application, cost_monthly, platform and url as properties that did not exist on the
- * type it was given. Deriving from the schema keeps one truth and survives a regenerate.
- *
- * Note the table itself has drifted — it carries both `cost_monthly` and `monthly_cost`,
- * and both `application` and `service_name`. That is a schema cleanup, not a types fix.
+ * A row of `saas_expenses`, exactly as the table stores it:
+ * id, org_id, vendor_id, name, amount, currency, cadence, renewal_date, owner, notes,
+ * created_at, updated_at. Nothing else. The table has no `department`, `application`,
+ * `cost_monthly`, `cost_annual`, `platform`, `url` or `source_sheet` column, whatever
+ * older code here implies — PostgREST answers 42703 "column does not exist" for each.
  */
 export type SaaSExpenseRow = Tables<'saas_expenses'>;
 
 /**
- * What a caller may write. Callers pass an interface (a page's form state), and an
- * interface is not assignable to Record<string, unknown> — interfaces get no implicit
- * index signature — so the write helpers took a shape no form could satisfy.
+ * What the page renders. This is a VIEW MODEL, not a row.
+ *
+ * The table stores one figure — `amount` — against a `cadence`. A monthly and an annual
+ * cost are *derived* from that pair and exist in no column, so a value of this type can
+ * never come back from a select and must never be handed to an insert. Typing the mapper
+ * output as `SaaSExpenseRow` was the original defect: it told the compiler that whatever
+ * the mapper invented was a column, which is how `department`, `application`, `platform`
+ * and `url` survived in the page for as long as they did.
  */
-export type SaaSExpenseInput = Partial<Omit<SaaSExpenseRow, 'id' | 'created_at' | 'updated_at'>>;
+export interface SaaSExpenseView extends SaaSExpenseRow {
+  cost_monthly: number;
+  cost_annual: number;
+}
+
+/**
+ * What a caller may write: the subset of real columns this page owns. Derived from the
+ * schema with Pick, so regenerating types is what catches a column being renamed.
+ * `org_id` is not here — the hook supplies it from the active org, never the caller.
+ */
+export type SaaSExpenseInput = Partial<
+  Pick<SaaSExpenseRow, 'name' | 'amount' | 'cadence' | 'renewal_date' | 'owner' | 'notes'>
+>;
 
 interface SaaSMetrics {
   totalMonthly: number;
   totalAnnual: number;
   totalTools: number;
-  totalDepartments: number;
+  totalOwners: number;
   renewingNext30Days: number;
 }
 
-function monthlyFromRow(row: { amount?: number | null; cadence?: string | null; cost_monthly?: number | null }): number {
-  if (row.cost_monthly) return Number(row.cost_monthly);
-  const amount = Number(row.amount || 0);
-  const cadence = (row.cadence || 'monthly').toLowerCase();
-  if (cadence === 'annual' || cadence === 'yearly') return amount / 12;
-  if (cadence === 'quarterly') return amount / 3;
-  return amount;
+/** The monthly equivalent of one row's amount, normalised across billing cadences. */
+export function monthlyFromRow(row: Pick<SaaSExpenseRow, 'amount' | 'cadence'>): number {
+  const amount = Number(row.amount ?? 0);
+  switch ((row.cadence ?? 'monthly').toLowerCase()) {
+    case 'annual':
+    case 'yearly':
+      return amount / 12;
+    case 'quarterly':
+      return amount / 3;
+    default:
+      return amount;
+  }
 }
 
-function mapExpense(row: Record<string, unknown>): SaaSExpenseRow {
-  const monthly = monthlyFromRow(row as { amount?: number; cadence?: string; cost_monthly?: number });
-  return {
-    id: String(row.id),
-    name: (row.name as string) || (row.application as string) || '',
-    application: (row.name as string) || (row.application as string) || '',
-    department: (row.owner as string) || (row.department as string) || '',
-    owner: (row.owner as string) || undefined,
-    amount: Number(row.amount || monthly),
-    cadence: (row.cadence as string) || 'monthly',
-    cost_monthly: monthly,
-    cost_annual: monthly * 12,
-    description: (row.notes as string) || (row.description as string) || '',
-    renewal_date: row.renewal_date as string | undefined,
-    notes: (row.notes as string) || undefined,
-    created_at: row.created_at as string | undefined,
-    updated_at: row.updated_at as string | undefined,
-  };
+/** Widen a stored row into the view model the page reads. */
+export function toView(row: SaaSExpenseRow): SaaSExpenseView {
+  const monthly = monthlyFromRow(row);
+  return { ...row, cost_monthly: monthly, cost_annual: monthly * 12 };
 }
 
 export function useSaaSExpenses() {
   const { orgId } = useOrg();
-  const [data, setData] = useState<SaaSExpenseRow[]>([]);
+  const [data, setData] = useState<SaaSExpenseView[]>([]);
   const [metrics, setMetrics] = useState<SaaSMetrics>({
     totalMonthly: 0,
     totalAnnual: 0,
     totalTools: 0,
-    totalDepartments: 0,
+    totalOwners: 0,
     renewingNext30Days: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -88,7 +91,7 @@ export function useSaaSExpenses() {
         .eq('org_id', orgId)
         .order('created_at', { ascending: false });
       if (expensesError) throw expensesError;
-      const expenseData = (expenses || []).map((row) => mapExpense(row as Record<string, unknown>));
+      const expenseData = (expenses ?? []).map(toView);
       setData(expenseData);
       const totalMonthly = expenseData.reduce((sum, row) => sum + row.cost_monthly, 0);
       const now = new Date();
@@ -97,7 +100,7 @@ export function useSaaSExpenses() {
         totalMonthly,
         totalAnnual: totalMonthly * 12,
         totalTools: expenseData.length,
-        totalDepartments: new Set(expenseData.map((row) => row.department).filter(Boolean)).size,
+        totalOwners: new Set(expenseData.map((row) => row.owner).filter(Boolean)).size,
         renewingNext30Days: expenseData.filter((row) => {
           if (!row.renewal_date) return false;
           const renewalDate = new Date(row.renewal_date);
@@ -119,15 +122,14 @@ export function useSaaSExpenses() {
   const addExpense = async (expense: SaaSExpenseInput) => {
     try {
       if (!orgId) throw new Error('No active organization');
-      const monthly = Number(expense.cost_monthly || expense.amount || 0);
       const { error: insertError } = await supabase.from('saas_expenses').insert({
         org_id: orgId,
-        name: expense.application || expense.name || 'Untitled',
-        amount: monthly,
-        cadence: 'monthly',
+        name: expense.name || 'Untitled',
+        amount: expense.amount ?? null,
+        cadence: expense.cadence || 'monthly',
         renewal_date: expense.renewal_date || null,
-        owner: expense.department || expense.owner || null,
-        notes: expense.notes || expense.description || null,
+        owner: expense.owner || null,
+        notes: expense.notes || null,
       });
       if (insertError) throw insertError;
       await fetchData();
@@ -139,12 +141,15 @@ export function useSaaSExpenses() {
 
   const updateExpense = async (id: string, updates: SaaSExpenseInput) => {
     try {
-      const payload: Record<string, unknown> = {};
-      if (updates.application || updates.name) payload.name = updates.application || updates.name;
-      if (updates.cost_monthly != null || updates.amount != null) payload.amount = updates.cost_monthly || updates.amount;
-      if (updates.renewal_date !== undefined) payload.renewal_date = updates.renewal_date;
-      if (updates.department || updates.owner) payload.owner = updates.department || updates.owner;
-      if (updates.notes !== undefined || updates.description !== undefined) payload.notes = updates.notes || updates.description;
+      // Only the keys the caller actually supplied are sent, so a partial edit cannot
+      // blank a column it never touched.
+      const payload: SaaSExpenseInput = {};
+      if (updates.name !== undefined) payload.name = updates.name;
+      if (updates.amount !== undefined) payload.amount = updates.amount;
+      if (updates.cadence !== undefined) payload.cadence = updates.cadence;
+      if (updates.renewal_date !== undefined) payload.renewal_date = updates.renewal_date || null;
+      if (updates.owner !== undefined) payload.owner = updates.owner || null;
+      if (updates.notes !== undefined) payload.notes = updates.notes || null;
       const { error: updateError } = await supabase.from('saas_expenses').update(payload).eq('id', id);
       if (updateError) throw updateError;
       await fetchData();
